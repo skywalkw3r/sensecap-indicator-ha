@@ -1,7 +1,7 @@
 #ifndef NAV_H
 #define NAV_H
 
-#include "lvgl/lvgl.h"
+#include "lvgl.h"
 
 /* Tile indices for the three main swipeable screens */
 #define NAV_TILE_HA_DATA  0   /* sensor data view */

@@ -4,7 +4,7 @@
  * Opts: --bpp 8 --size 20 --font /Users/virgil/seeed/SenseCAP_Terminal_ESP32/code/squareline_studio/sensecap_d1/assets/fonts/LibraSans-Bold.ttf -o /Users/virgil/seeed/SenseCAP_Terminal_ESP32/code/squareline_studio/sensecap_d1/assets/fonts/ui_font_font0.c --format lvgl -r 0x20-0x7f --no-compress --no-prefilter
  ******************************************************************************/
 
-#include "lvgl/lvgl.h"
+#include "lvgl.h"
 
 #ifndef UI_FONT_FONT0
 #define UI_FONT_FONT0 1

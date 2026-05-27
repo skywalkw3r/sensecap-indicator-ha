@@ -8,6 +8,8 @@
 
 #include <stdbool.h>
 #include "esp_err.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_ops.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +47,20 @@ esp_err_t bsp_lcd_deinit(void);
  *    - Others: Fail
  */
 esp_err_t bsp_lcd_flush(int x1, int y1, int x2, int y2, const void *p_data);
+
+/**
+ * @brief Get the esp_lcd panel handle created by bsp_lcd_init().
+ *
+ * @return Active LCD panel handle, or NULL before LCD initialization.
+ */
+esp_lcd_panel_handle_t bsp_lcd_get_panel_handle(void);
+
+/**
+ * @brief Get the esp_lcd panel IO handle created by bsp_lcd_init().
+ *
+ * @return Active LCD panel IO handle, or NULL for RGB panels.
+ */
+esp_lcd_panel_io_handle_t bsp_lcd_get_io_handle(void);
 
 /**
  * @brief Set callback function when a single flush transaction is finished

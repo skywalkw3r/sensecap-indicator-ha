@@ -340,6 +340,16 @@ esp_err_t bsp_lcd_flush(int x1, int y1, int x2, int y2, const void *p_data)
     return ESP_OK;
 }
 
+esp_lcd_panel_handle_t bsp_lcd_get_panel_handle(void)
+{
+    return panel_handle;
+}
+
+esp_lcd_panel_io_handle_t bsp_lcd_get_io_handle(void)
+{
+    return io_handle;
+}
+
 esp_err_t bsp_lcd_set_cb(bool (*trans_done_cb)(void *), void *data)
 {
     if (esp_ptr_executable(trans_done_cb)) {

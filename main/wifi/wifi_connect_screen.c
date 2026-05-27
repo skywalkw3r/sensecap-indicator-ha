@@ -1,3 +1,4 @@
+#include <string.h>
 #include "wifi_connect_screen.h"
 #include "view_data.h"
 #include "esp_log.h"
@@ -21,14 +22,14 @@ struct wifi_connect_screen {
 static void _dismiss(wifi_connect_screen_t *s) {
     if(!s) return;
     if(s->kb) {
-        lv_obj_del(s->kb);
+        lv_obj_delete(s->kb);
         s->kb = NULL;
     }
     if(s->container) {
-        lv_obj_del(s->container);
+        lv_obj_delete(s->container);
         s->container = NULL;
     }
-    lv_obj_clear_flag(lv_layer_top(), LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(lv_layer_top(), LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_opa(lv_layer_top(), LV_OPA_TRANSP, 0);
     free(s);
 }
@@ -79,7 +80,7 @@ static void _on_password_changed(lv_event_t *e) {
                                     lv_color_hex(0x529d53), LV_PART_MAIN | LV_STATE_DEFAULT);
     } else if(!valid && s->password_ready) {
         s->password_ready = false;
-        lv_obj_clear_flag(s->join_btn, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(s->join_btn, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_style_text_color(lv_obj_get_child(s->join_btn, 0),
                                     lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
@@ -88,7 +89,7 @@ static void _on_password_changed(lv_event_t *e) {
 static void _on_keyboard_ready(lv_event_t *e) {
     wifi_connect_screen_t *s = (wifi_connect_screen_t *)lv_event_get_user_data(e);
     if(s->password_ready && s->join_btn) {
-        lv_event_send(s->join_btn, LV_EVENT_CLICKED, NULL);
+        lv_obj_send_event(s->join_btn, LV_EVENT_CLICKED, NULL);
     }
 }
 
@@ -120,10 +121,10 @@ wifi_connect_screen_t *wifi_connect_screen_show(const char *ssid, bool have_pass
     s->container = lv_obj_create(lv_layer_top());
     lv_obj_set_size(s->container, 420, 420);
     lv_obj_set_align(s->container, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(s->container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(s->container, LV_OBJ_FLAG_SCROLLABLE);
 
     /* Cancel button */
-    lv_obj_t *cancel_btn = lv_btn_create(s->container);
+    lv_obj_t *cancel_btn = lv_button_create(s->container);
     lv_obj_set_size(cancel_btn, 100, 50);
     lv_obj_set_align(cancel_btn, LV_ALIGN_TOP_LEFT);
     lv_obj_set_style_bg_color(cancel_btn, lv_color_hex(0x292831), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -133,7 +134,7 @@ wifi_connect_screen_t *wifi_connect_screen_show(const char *ssid, bool have_pass
     lv_obj_set_style_text_font(cancel_label, &ui_font_font0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     /* Join button */
-    s->join_btn = lv_btn_create(s->container);
+    s->join_btn = lv_button_create(s->container);
     lv_obj_set_size(s->join_btn, 70, 50);
     lv_obj_set_align(s->join_btn, LV_ALIGN_TOP_RIGHT);
     lv_obj_set_style_bg_color(s->join_btn, lv_color_hex(0x292831), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -157,7 +158,7 @@ wifi_connect_screen_t *wifi_connect_screen_show(const char *ssid, bool have_pass
         lv_obj_set_pos(pw_label, -80, 100);
 
         /* Disable join until password is long enough */
-        lv_obj_clear_flag(s->join_btn, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(s->join_btn, LV_OBJ_FLAG_CLICKABLE);
 
         /* Password textarea */
         s->password_input = lv_textarea_create(s->container);
@@ -196,10 +197,10 @@ wifi_connect_screen_t *wifi_details_screen_show(const char *ssid) {
     s->container = lv_obj_create(lv_layer_top());
     lv_obj_set_size(s->container, 300, 200);
     lv_obj_set_align(s->container, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(s->container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(s->container, LV_OBJ_FLAG_SCROLLABLE);
 
     /* Cancel */
-    lv_obj_t *cancel_btn = lv_btn_create(s->container);
+    lv_obj_t *cancel_btn = lv_button_create(s->container);
     lv_obj_set_size(cancel_btn, 100, 50);
     lv_obj_set_align(cancel_btn, LV_ALIGN_BOTTOM_RIGHT);
     lv_obj_set_style_bg_color(cancel_btn, lv_color_hex(0x292831), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -211,7 +212,7 @@ wifi_connect_screen_t *wifi_details_screen_show(const char *ssid) {
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
 
     /* Delete */
-    lv_obj_t *delete_btn = lv_btn_create(s->container);
+    lv_obj_t *delete_btn = lv_button_create(s->container);
     lv_obj_set_size(delete_btn, 100, 50);
     lv_obj_set_align(delete_btn, LV_ALIGN_BOTTOM_LEFT);
     lv_obj_set_style_bg_color(delete_btn, lv_color_hex(0x292831), LV_PART_MAIN | LV_STATE_DEFAULT);

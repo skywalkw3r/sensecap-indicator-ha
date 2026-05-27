@@ -1,12 +1,13 @@
+#include <string.h>
 #include "wifi_list_screen.h"
 #include "indicator_util.h"
 
 /* Re-declare only the image assets this component needs — avoids pulling
  * in the full ui.h / Squareline namespace. */
-LV_IMG_DECLARE(ui_img_wifi_1_png);
-LV_IMG_DECLARE(ui_img_wifi_2_png);
-LV_IMG_DECLARE(ui_img_wifi_3_png);
-LV_IMG_DECLARE(ui_img_lock_png);
+LV_IMAGE_DECLARE(ui_img_wifi_1_png);
+LV_IMAGE_DECLARE(ui_img_wifi_2_png);
+LV_IMAGE_DECLARE(ui_img_wifi_3_png);
+LV_IMAGE_DECLARE(ui_img_lock_png);
 
 struct wifi_list_screen {
     lv_obj_t        *parent;
@@ -18,7 +19,7 @@ struct wifi_list_screen {
 
 static void _rebuild_list(wifi_list_screen_t *s) {
     if(s->list) {
-        lv_obj_del(s->list);
+        lv_obj_delete(s->list);
     }
     s->list = lv_list_create(s->parent);
     lv_obj_set_style_pad_row(s->list, 8, 0);
@@ -32,7 +33,7 @@ static void _rebuild_list(wifi_list_screen_t *s) {
 
 static void _add_item(wifi_list_screen_t *s, const char *ssid,
                       bool have_password, int rssi, bool is_connect) {
-    lv_obj_t *btn = lv_btn_create(s->list);
+    lv_obj_t *btn = lv_button_create(s->list);
     lv_obj_set_size(btn, 380, 50);
     lv_obj_set_align(btn, LV_ALIGN_CENTER);
 
@@ -54,19 +55,19 @@ static void _add_item(wifi_list_screen_t *s, const char *ssid,
     lv_obj_set_align(label, LV_ALIGN_LEFT_MID);
     lv_obj_set_x(label, 10);
 
-    lv_obj_t *rssi_icon = lv_img_create(btn);
+    lv_obj_t *rssi_icon = lv_image_create(btn);
     lv_obj_set_align(rssi_icon, LV_ALIGN_RIGHT_MID);
     lv_obj_set_x(rssi_icon, -10);
     switch(wifi_rssi_level_get(rssi)) {
-        case 1: lv_img_set_src(rssi_icon, &ui_img_wifi_1_png); break;
-        case 2: lv_img_set_src(rssi_icon, &ui_img_wifi_2_png); break;
-        case 3: lv_img_set_src(rssi_icon, &ui_img_wifi_3_png); break;
+        case 1: lv_image_set_src(rssi_icon, &ui_img_wifi_1_png); break;
+        case 2: lv_image_set_src(rssi_icon, &ui_img_wifi_2_png); break;
+        case 3: lv_image_set_src(rssi_icon, &ui_img_wifi_3_png); break;
         default: break;
     }
 
     if(have_password) {
-        lv_obj_t *lock = lv_img_create(btn);
-        lv_img_set_src(lock, &ui_img_lock_png);
+        lv_obj_t *lock = lv_image_create(btn);
+        lv_image_set_src(lock, &ui_img_lock_png);
         lv_obj_set_align(lock, LV_ALIGN_RIGHT_MID);
         lv_obj_set_x(lock, -60);
     }
@@ -101,7 +102,7 @@ const char *wifi_list_screen_get_item_ssid(wifi_list_screen_t *s, lv_obj_t *item
 void wifi_list_screen_show_spinner(wifi_list_screen_t *s) {
     if(!s) return;
     if(s->list)      lv_obj_add_flag(s->list, LV_OBJ_FLAG_HIDDEN);
-    if(s->scan_wait) lv_obj_clear_flag(s->scan_wait, LV_OBJ_FLAG_HIDDEN);
+    if(s->scan_wait) lv_obj_remove_flag(s->scan_wait, LV_OBJ_FLAG_HIDDEN);
 }
 
 void wifi_list_screen_update(wifi_list_screen_t *s, const struct view_data_wifi_list *list) {
@@ -121,12 +122,12 @@ void wifi_list_screen_update(wifi_list_screen_t *s, const struct view_data_wifi_
                   list->aps[i].rssi, false);
     }
 
-    lv_obj_clear_flag(s->list, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(s->list, LV_OBJ_FLAG_HIDDEN);
     if(s->scan_wait) lv_obj_add_flag(s->scan_wait, LV_OBJ_FLAG_HIDDEN);
 }
 
 void wifi_list_screen_destroy(wifi_list_screen_t *s) {
     if(!s) return;
-    if(s->list) lv_obj_del(s->list);
+    if(s->list) lv_obj_delete(s->list);
     free(s);
 }

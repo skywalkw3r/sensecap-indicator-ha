@@ -26,12 +26,12 @@
 #define SWITCH_TRACK 0x4F4F4F
 #define ARC_TRACK 0x1C1C1C
 
-LV_IMG_DECLARE(ui_img_ic_temp_png);
-LV_IMG_DECLARE(ui_img_ic_hum_png);
-LV_IMG_DECLARE(ui_img_ic_switch1_on_png);
-LV_IMG_DECLARE(ui_img_ic_switch1_off_png);
-LV_IMG_DECLARE(ui_img_ic_switch2_on_png);
-LV_IMG_DECLARE(ui_img_ic_switch2_off_png);
+LV_IMAGE_DECLARE(ui_img_ic_temp_png);
+LV_IMAGE_DECLARE(ui_img_ic_hum_png);
+LV_IMAGE_DECLARE(ui_img_ic_switch1_on_png);
+LV_IMAGE_DECLARE(ui_img_ic_switch1_off_png);
+LV_IMAGE_DECLARE(ui_img_ic_switch2_on_png);
+LV_IMAGE_DECLARE(ui_img_ic_switch2_off_png);
 LV_FONT_DECLARE(ui_font_font0);
 LV_FONT_DECLARE(ui_font_font2);
 
@@ -43,8 +43,8 @@ typedef struct {
     int index;
     lv_obj_t *widget;
     lv_obj_t *icon;
-    const lv_img_dsc_t *icon_on;
-    const lv_img_dsc_t *icon_off;
+    const lv_image_dsc_t *icon_on;
+    const lv_image_dsc_t *icon_off;
     void *aux;
     widget_update_fn update;
 } switch_slot_t;
@@ -55,15 +55,15 @@ struct ha_switch_screen {
 };
 
 typedef struct {
-    const lv_img_dsc_t *icon;
+    const lv_image_dsc_t *icon;
     const char *name;
     const char *unit;
     uint32_t accent_color;
-    lv_coord_t x;
-    lv_coord_t y;
-    lv_coord_t data_x;
-    lv_coord_t data_y;
-    lv_coord_t unit_y;
+    int32_t x;
+    int32_t y;
+    int32_t data_x;
+    int32_t data_y;
+    int32_t unit_y;
 } sensor_card_spec_t;
 
 static ha_switch_screen_t _instance;
@@ -125,7 +125,7 @@ static void _set_toggle_icon(switch_slot_t *slot, bool checked)
         return;
     }
 
-    lv_img_set_src(slot->icon, checked ? slot->icon_on : slot->icon_off);
+    lv_image_set_src(slot->icon, checked ? slot->icon_on : slot->icon_off);
 }
 
 static void _switch_toggle_event_cb(lv_event_t *e)
@@ -185,9 +185,9 @@ static void _update_toggle(lv_obj_t *w, int value, void *aux)
     if (value) {
         lv_obj_add_state(w, LV_STATE_CHECKED);
     } else {
-        lv_obj_clear_state(w, LV_STATE_CHECKED);
+        lv_obj_remove_state(w, LV_STATE_CHECKED);
     }
-    lv_event_send(w, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_send_event(w, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
 static void _update_arc(lv_obj_t *w, int value, void *aux)
@@ -199,7 +199,7 @@ static void _update_arc(lv_obj_t *w, int value, void *aux)
         lv_label_set_text((lv_obj_t *)aux, buf);
     }
     lv_arc_set_value(w, value);
-    lv_event_send(w, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_send_event(w, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
 static void _update_slider(lv_obj_t *w, int value, void *aux)
@@ -207,21 +207,21 @@ static void _update_slider(lv_obj_t *w, int value, void *aux)
     (void)aux;
 
     lv_slider_set_value(w, value, LV_ANIM_ON);
-    lv_event_send(w, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_send_event(w, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
-static void _style_panel(lv_obj_t *obj, lv_coord_t width, lv_coord_t height, lv_coord_t x, lv_coord_t y)
+static void _style_panel(lv_obj_t *obj, int32_t width, int32_t height, int32_t x, int32_t y)
 {
     lv_obj_set_size(obj, width, height);
     lv_obj_set_pos(obj, x, y);
-    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(obj, CARD_RADIUS, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(obj, lv_color_hex(CARD_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
-static void _style_checkable_card(lv_obj_t *btn, lv_coord_t width, lv_coord_t height, lv_coord_t x, lv_coord_t y)
+static void _style_checkable_card(lv_obj_t *btn, int32_t width, int32_t height, int32_t x, int32_t y)
 {
     _style_panel(btn, width, height, x, y);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE | LV_OBJ_FLAG_SCROLL_ON_FOCUS);
@@ -244,7 +244,7 @@ static void _create_header(lv_obj_t *tile, const char *title)
     lv_obj_t *header = lv_obj_create(tile);
     lv_obj_set_size(header, TILE_WIDTH, HEADER_HEIGHT);
     lv_obj_set_pos(header, 0, 0);
-    lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -258,15 +258,15 @@ static void _create_sensor_card(lv_obj_t *tile, const sensor_card_spec_t *spec)
 {
     lv_color_t accent = lv_color_hex(spec->accent_color);
 
-    lv_obj_t *card = lv_btn_create(tile);
+    lv_obj_t *card = lv_button_create(tile);
     _style_panel(card, CARD_WIDTH, CARD_HEIGHT, spec->x, spec->y);
     lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
 
-    lv_obj_t *icon = lv_img_create(card);
-    lv_img_set_src(icon, spec->icon);
+    lv_obj_t *icon = lv_image_create(card);
+    lv_image_set_src(icon, spec->icon);
     lv_obj_set_pos(icon, 69, 22);
     lv_obj_add_flag(icon, LV_OBJ_FLAG_ADV_HITTEST);
-    lv_obj_clear_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *data = lv_label_create(card);
     lv_obj_set_size(data, 100, LV_SIZE_CONTENT);
@@ -285,15 +285,15 @@ static void _create_sensor_card(lv_obj_t *tile, const sensor_card_spec_t *spec)
     lv_obj_set_y(name, -5);
 }
 
-static lv_obj_t *_create_large_toggle(lv_obj_t *tile, switch_slot_t *slot, lv_coord_t x, lv_coord_t y,
-                                      const lv_img_dsc_t *icon_on, const lv_img_dsc_t *icon_off,
-                                      lv_coord_t icon_x, lv_coord_t icon_y, bool center_icon)
+static lv_obj_t *_create_large_toggle(lv_obj_t *tile, switch_slot_t *slot, int32_t x, int32_t y,
+                                      const lv_image_dsc_t *icon_on, const lv_image_dsc_t *icon_off,
+                                      int32_t icon_x, int32_t icon_y, bool center_icon)
 {
-    lv_obj_t *btn = lv_btn_create(tile);
+    lv_obj_t *btn = lv_button_create(tile);
     _style_checkable_card(btn, CARD_WIDTH, CARD_HEIGHT, x, y);
 
-    lv_obj_t *icon = lv_img_create(btn);
-    lv_img_set_src(icon, icon_off);
+    lv_obj_t *icon = lv_image_create(btn);
+    lv_image_set_src(icon, icon_off);
     if (center_icon) {
         lv_obj_set_align(icon, LV_ALIGN_CENTER);
         lv_obj_set_y(icon, icon_y);
@@ -301,7 +301,7 @@ static lv_obj_t *_create_large_toggle(lv_obj_t *tile, switch_slot_t *slot, lv_co
         lv_obj_set_pos(icon, icon_x, icon_y);
     }
     lv_obj_add_flag(icon, LV_OBJ_FLAG_ADV_HITTEST);
-    lv_obj_clear_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *label = _create_label(btn, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
     lv_obj_set_align(label, LV_ALIGN_BOTTOM_MID);
@@ -316,17 +316,17 @@ static lv_obj_t *_create_large_toggle(lv_obj_t *tile, switch_slot_t *slot, lv_co
     return btn;
 }
 
-static lv_obj_t *_create_row_toggle(lv_obj_t *tile, switch_slot_t *slot, lv_coord_t x, lv_coord_t y,
-                                    const lv_img_dsc_t *icon_on, const lv_img_dsc_t *icon_off)
+static lv_obj_t *_create_row_toggle(lv_obj_t *tile, switch_slot_t *slot, int32_t x, int32_t y,
+                                    const lv_image_dsc_t *icon_on, const lv_image_dsc_t *icon_off)
 {
-    lv_obj_t *btn = lv_btn_create(tile);
+    lv_obj_t *btn = lv_button_create(tile);
     _style_checkable_card(btn, CARD_WIDTH, ROW_HEIGHT, x, y);
 
-    lv_obj_t *icon = lv_img_create(btn);
-    lv_img_set_src(icon, icon_off);
+    lv_obj_t *icon = lv_image_create(btn);
+    lv_image_set_src(icon, icon_off);
     lv_obj_set_pos(icon, 120, 2);
     lv_obj_add_flag(icon, LV_OBJ_FLAG_ADV_HITTEST);
-    lv_obj_clear_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *label = _create_label(btn, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
     lv_obj_set_pos(label, 16, 22);
@@ -340,13 +340,13 @@ static lv_obj_t *_create_row_toggle(lv_obj_t *tile, switch_slot_t *slot, lv_coor
     return btn;
 }
 
-static lv_obj_t *_create_embedded_switch(lv_obj_t *tile, switch_slot_t *slot, lv_coord_t x, lv_coord_t y,
-                                         lv_coord_t switch_width, lv_coord_t switch_height)
+static lv_obj_t *_create_embedded_switch(lv_obj_t *tile, switch_slot_t *slot, int32_t x, int32_t y,
+                                         int32_t switch_width, int32_t switch_height)
 {
-    lv_obj_t *card = lv_btn_create(tile);
+    lv_obj_t *card = lv_button_create(tile);
     _style_panel(card, CARD_WIDTH, ROW_HEIGHT, x, y);
     lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    lv_obj_clear_flag(card, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE);
+    lv_obj_remove_flag(card, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE);
 
     lv_obj_t *label = _create_label(card, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
     lv_obj_set_pos(label, 16, 22);
@@ -374,14 +374,14 @@ static void _create_arc_card(lv_obj_t *tile, switch_slot_t *slot)
 {
     lv_obj_t *card = lv_obj_create(tile);
     _style_panel(card, CARD_WIDTH, CARD_HEIGHT, 244, 96);
-    lv_obj_clear_flag(card, LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE |
+    lv_obj_remove_flag(card, LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE |
                             LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM);
 
     lv_obj_t *arc = lv_arc_create(card);
     lv_obj_set_size(arc, 130, 125);
     lv_obj_set_align(arc, LV_ALIGN_CENTER);
     lv_obj_add_flag(arc, LV_OBJ_FLAG_FLEX_IN_NEW_TRACK);
-    lv_obj_clear_flag(arc, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SCROLLABLE |
+    lv_obj_remove_flag(arc, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SCROLLABLE |
                            LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN);
     lv_arc_set_value(arc, 70);
     lv_arc_set_bg_angles(arc, 140, 40);
@@ -414,10 +414,10 @@ static void _create_arc_card(lv_obj_t *tile, switch_slot_t *slot)
 
 static void _create_slider_card(lv_obj_t *tile, switch_slot_t *slot)
 {
-    lv_obj_t *card = lv_btn_create(tile);
+    lv_obj_t *card = lv_button_create(tile);
     _style_panel(card, 440, ROW_HEIGHT, 22, 360);
     lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    lv_obj_clear_flag(card, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_remove_flag(card, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     lv_obj_t *label = _create_label(card, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
     lv_obj_set_align(label, LV_ALIGN_BOTTOM_MID);

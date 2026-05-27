@@ -25,17 +25,27 @@
 
 ---
 
+- [x] **Phase 4** — lv_tileview 导航重构（2026-05-28，build 通过）
+  - nav 模块：3 tile 水平 tileview（ha_data / ha_ctrl / ha_mix）
+  - wifi / display / broker → lv_layer_top() modal
+  - main/ui/ 完全删除，Squareline 依赖清零
+  - 资源迁移至 main/assets/
+
+---
+
+---
+
+- [x] **Phase 1** — LVGL v9 + ESP Component Manager（2026-05-28，build 通过）
+  - main/idf_component.yml：lvgl/lvgl >=9.0.0 + espressif/esp_lvgl_port >=2.0.0
+  - 删除 components/lvgl/（本地 LVGL 8 组件）
+  - 重写 main/lv_port.c 使用 esp_lvgl_port v2 API
+  - 修复 LVGL 9 API 变更：lv_event_send→lv_obj_send_event，lvgl/lvgl.h→lvgl.h
+  - 修复 assets/ 图像描述符：always_zero→magic，LV_IMG_CF_TRUE_COLOR_ALPHA→LV_COLOR_FORMAT_NATIVE_WITH_ALPHA，新增 stride 字段
+  - bsp_lcd: 新增 get_panel_handle / get_io_handle 供 esp_lvgl_port 注册 display
+
+---
+
 ## 待办
-
-- [ ] **Phase 1** — LVGL v9 + ESP Component Manager
-  - 用 `idf_component.yml` 替换本地 components/lvgl/
-  - 引入 espressif/esp_lvgl_port v2.8.0
-  - 用 lv_api_map_v8.h 做临时桥接
-  - 需要全面 UI 重构
-
-- [ ] **Phase 4** — 导航重构 → lv_tileview
-  - 替换当前 Squareline 跳转式切换（_ui_screen_change）
-  - 实现跟手滑动（swipe UX）
 
 - [ ] **合并到 main**
   - 完整 build 验证通过后 PR merge
