@@ -11,7 +11,7 @@ Scope: SenseCAP Indicator Home Assistant firmware, with emphasis on the ESP32S3 
 
 ## Starter Project Guidance
 
-The starter project at `/Users/spencer/Seeed/dev/indicator/sensecap-indicator-starter` is a reference for Agent-Driven workflow, not a source of driver code for this firmware.
+The SenseCAP Indicator starter project is a reference for Agent-Driven workflow, not a source of driver code for this firmware.
 
 Use these starter ideas:
 

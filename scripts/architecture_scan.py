@@ -164,7 +164,7 @@ def iter_source_files() -> list[Path]:
         if not root.exists():
             continue
         for path in root.rglob("*"):
-            if path.suffix in SOURCE_EXTS:
+            if path.is_file() and path.suffix in SOURCE_EXTS:
                 files.append(path)
     return sorted(files)
 
@@ -301,7 +301,7 @@ def scan_service_callbacks(path: Path, text: str, findings: list[Finding]) -> No
 def scan() -> list[Finding]:
     findings: list[Finding] = []
     for path in iter_source_files():
-        text = path.read_text(errors="ignore")
+        text = path.read_text(encoding="utf-8", errors="ignore")
         scan_model_ui_includes(path, text, findings)
         scan_lvgl_calls(path, text, findings)
         scan_shared_bsp_includes(path, text, findings)
