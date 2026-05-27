@@ -1,7 +1,7 @@
 #include "sensor_model.h"
 #include "esp_sntp.h"
 #include "freertos/semphr.h"
-#include "esp32_rp2040.h"
+#include "rp2040.h"
 
 #include "view_data.h"
 #define sensor_model_DEBUG 1

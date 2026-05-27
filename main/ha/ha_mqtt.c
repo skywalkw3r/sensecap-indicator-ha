@@ -3,7 +3,7 @@
 
 #include "ha.h"
 #include "home_assistant_config.h"
-#include "indicator_mqtt.h"
+#include "mqtt.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "freertos/FreeRTOS.h"

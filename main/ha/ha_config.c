@@ -4,7 +4,7 @@
 #include "ha_mqtt.h"
 #include "view_data.h"
 #include "home_assistant_config.h"
-#include "indicator_storage_nvs.h"
+#include "storage_nvs.h"
 #include "lv_port.h"
 #include "ui.h"
 #include "indicator_util.h"

@@ -1,5 +1,5 @@
 #include "display_model.h"
-#include "indicator_storage_nvs.h"
+#include "storage_nvs.h"
 
 #include "freertos/semphr.h"
 

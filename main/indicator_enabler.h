@@ -3,22 +3,22 @@
 
 // uncomment to use the `app`
 
-#include "indicator_storage_nvs.h"
+#include "storage_nvs.h"
 
-#include "indicator_btn.h"
+#include "btn.h"
 
-#include "indicator_display.h"
+#include "display.h"
 
-#include "esp32_rp2040.h"
+#include "rp2040.h"
 
-#include "indicator_sensor.h"
+#include "sensor.h"
 
-#include "indicator_wifi.h"
+#include "wifi.h"
 
-#include "indicator_mqtt.h"
+#include "mqtt.h"
 
-#include "indicator_cmd.h"
+#include "cmd.h"
 
-#include "indicator_ha.h"
+#include "ha.h"
 
 #endif /*INDICATOR_INCLUDES_H*/

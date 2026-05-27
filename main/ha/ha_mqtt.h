@@ -2,7 +2,7 @@
 #define HA_MQTT_H
 
 #include "esp_event.h"
-#include "indicator_mqtt.h"
+#include "mqtt.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -3,8 +3,8 @@
 #include "esp_console.h"
 
 #include "home_assistant_config.h"
-#include "indicator_ha.h"
-#include "indicator_storage_nvs.h"
+#include "ha.h"
+#include "storage_nvs.h"
 #include "indicator_util.h"
 #include <ctype.h>
 #include <stdio.h>

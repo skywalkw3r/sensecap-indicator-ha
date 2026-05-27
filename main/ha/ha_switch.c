@@ -3,7 +3,7 @@
 #include "view_data.h"
 #include "home_assistant_config.h"
 #include "cJSON.h"
-#include "indicator_storage_nvs.h"
+#include "storage_nvs.h"
 #include "lv_port.h"
 #include "esp_log.h"
 #include "mqtt_client.h"

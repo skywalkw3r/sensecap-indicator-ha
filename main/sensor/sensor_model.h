@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include "esp32_rp2040.h"
+#include "rp2040.h"
 #include "view_data.h"
 
 #ifdef __cplusplus
