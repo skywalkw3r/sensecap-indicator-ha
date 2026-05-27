@@ -31,7 +31,7 @@ main/
     ha_config.c           Broker NVS config + IP display UI (owns ha_cfg_get/set).
     ha_sensor.c           External HA sensor subscribe/publish.
     ha_switch.c           Switch entity state, MQTT pub/sub, NVS persistence.
-    ha_switch_screen.c    LVGL widget component for 8 switch widgets. Only HA file touching ui.h.
+    ha_switch_screen.c    LVGL widget component that builds the 8 switch widgets on nav tiles.
     ha_switch_screen.h    Public interface: create / update / destroy.
 
   ui/                     Squareline Studio generated code — being phased out.
@@ -95,7 +95,7 @@ lv_port_sem_take();
 lv_port_sem_give();
 ```
 
-Files that currently hold this lock: `indicator_wifi_view.c`, `indicator_sensor_view.c`, `ha/ha_config.c`, `ha/ha_switch.c`, `indicator_view.c`.
+Files that currently hold this lock: `indicator_wifi_view.c`, `indicator_sensor_view.c`, `ha/ha_config.c`, `ha/ha_switch.c`, `ha/ha_switch_screen.c`, `indicator_view.c`.
 
 Rule: if your event handler calls any `lv_*` function, wrap it in the semaphore pair.
 
@@ -112,11 +112,11 @@ No cross-domain event hops for in-domain state changes.
 
 ### Screen components (ha_switch_screen.c pattern)
 LVGL widget access is encapsulated in a `*_screen_t` struct:
-- `create()` — builds or wraps widget tree, called from view init after `ui_init()`
+- `create()` — builds or wraps widget tree, called from view init after required parent screens/nav containers exist
 - `update(s, index, value)` — updates widget state, caller holds LVGL lock
 - `destroy(s)` — cleanup
 
-The `*_screen.c` file is the **only** file in its domain that may `#include "ui.h"`.
+New screen components should prefer direct widget creation plus explicit asset declarations over SquareLine globals.
 
 ---
 
@@ -137,4 +137,4 @@ The `*_screen.c` file is the **only** file in its domain that may `#include "ui.
 
 **Adding a new event**: add it to the enum in `view_data.h` with a full manifest comment (P/C/Payload/LVGL). Add it before `VIEW_EVENT_ALL`.
 
-**Adding a new screen component**: follow `ha/ha_switch_screen.c` as the template. The new `*_screen.c` is the only file in its domain that may import `ui.h`.
+**Adding a new screen component**: follow `ha/ha_switch_screen.c` as the template. Prefer local widget ownership and `LV_IMG_DECLARE` / `LV_FONT_DECLARE` for generated assets instead of importing `ui.h`.

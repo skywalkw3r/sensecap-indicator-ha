@@ -5,8 +5,8 @@
 
 typedef struct ha_switch_screen ha_switch_screen_t;
 
-// Wraps existing SquareLine-generated widgets into a component.
-// Must be called after ui_init() has run.
+// Builds the Home Assistant switch widgets on the nav tiles.
+// Must be called after nav_init() has run.
 ha_switch_screen_t *ha_switch_screen_create(void);
 
 // Update widget state for switch at index [0..7].

@@ -141,6 +141,8 @@ MODEL_FILE_PATTERNS = (
 LVGL_CALL_RE = re.compile(r"\b(lv_[a-zA-Z0-9_]+)\s*\(")
 EVENT_ENUM_RE = re.compile(r"^\s*(VIEW_EVENT_[A-Z0-9_]+)\s*(?:=.*?)?,?\s*(?://\s*(.*))?$")
 MODEL_UI_INCLUDE_RE = re.compile(r"#\s*include\s*[<\"](?:ui/)?ui\.h[>\"]")
+HA_SWITCH_SCREEN_UI_INCLUDE_RE = re.compile(r"#\s*include\s*[<\"](?:ui/)?(?:ui|ui_helpers)\.h[>\"]")
+HA_SWITCH_SCREEN_GLOBAL_RE = re.compile(r"\bui_switch(?:[0-9]|_btn3)\w*\b")
 BSP_INCLUDE_RE = re.compile(r"#\s*include\s+[<\"](bsp_[^>\"]+)[>\"]")
 SERVICE_CALLBACK_RE = re.compile(r"\b([a-zA-Z0-9_]+_register_(?:cb|callback))\s*\(")
 
@@ -231,6 +233,29 @@ def scan_model_ui_includes(path: Path, text: str, findings: list[Finding]) -> No
         )
 
 
+def scan_ha_switch_squareline_bindings(path: Path, text: str, findings: list[Finding]) -> None:
+    if rel_key(path) != "main/ha/ha_switch_screen.c":
+        return
+    for match in HA_SWITCH_SCREEN_UI_INCLUDE_RE.finditer(text):
+        line = line_number(text, match.start())
+        add_finding(
+            findings,
+            path,
+            line,
+            "ha-switch-squareline-binding",
+            "ha_switch_screen must create its own widgets without SquareLine UI headers",
+        )
+    for match in HA_SWITCH_SCREEN_GLOBAL_RE.finditer(text):
+        line = line_number(text, match.start())
+        add_finding(
+            findings,
+            path,
+            line,
+            "ha-switch-squareline-binding",
+            "ha_switch_screen must bind local widget handles, not SquareLine switch globals",
+        )
+
+
 def scan_lvgl_calls(path: Path, text: str, findings: list[Finding]) -> None:
     if is_view_file(path):
         return
@@ -308,6 +333,7 @@ def scan() -> list[Finding]:
     for path in iter_source_files():
         text = path.read_text(encoding="utf-8", errors="ignore")
         scan_model_ui_includes(path, text, findings)
+        scan_ha_switch_squareline_bindings(path, text, findings)
         scan_lvgl_calls(path, text, findings)
         scan_shared_bsp_includes(path, text, findings)
         scan_event_payload_comments(path, text, findings)
