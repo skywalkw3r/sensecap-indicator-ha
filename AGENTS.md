@@ -64,20 +64,20 @@ View initialization starts SquareLine UI and view handlers. Model initialization
 
 ## Verification
 
-Preferred local checks:
+Stage 1 target local checks, added by later Stage 1 tasks:
 
 ```bash
 python3 scripts/dev_check.py --skip-build
 python3 scripts/dev_check.py
 ```
 
-If ESP-IDF is not available, run at least:
+The architecture-only fallback is also added later in Stage 1:
 
 ```bash
 python3 scripts/architecture_scan.py
 ```
 
-The firmware build path is:
+Until those scripts exist, the valid current check is the firmware build when ESP-IDF is available:
 
 ```bash
 sh build.sh
