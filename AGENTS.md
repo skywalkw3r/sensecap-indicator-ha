@@ -80,7 +80,7 @@ python3 scripts/architecture_scan.py
 The firmware build path is:
 
 ```bash
-sh build.sh
+./dev build
 ```
 
-`build.sh` currently deletes `build/` before building. Do not change that behavior as part of Stage 1 unless the user approves it.
+`./dev build` deletes `build/` before building by default (pass `--no-clean` for an incremental build). Preserve this clean-by-default behavior unless the user explicitly approves changing it.

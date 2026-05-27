@@ -1,34 +1,6 @@
-# SenseCAP Indicator Home Assistant
+# SenseCAP Indicator — Home Assistant Firmware
 
-<p align="left">
-  <a href="https://docs.espressif.com/projects/esp-idf/en/release-v5.4/esp32s3/">
-    <img src="https://img.shields.io/badge/esp--idf-v5.4.x-00b202" alt="idf-version">
-  </a>
-  <img src="https://img.shields.io/badge/version-v1.1.0-blue" alt="version">
-</p>
-
-This firmware turns the SenseCAP Indicator into a Home Assistant companion panel. It connects to Wi-Fi, publishes the built-in environmental sensors through MQTT, and exposes on-screen controls that can be driven from Home Assistant.
-
-## Version
-
-- Current firmware: `v1.1.0`
-- RP2040 coprocessor firmware: `v2.1.0`
-- Baseline release: `v1.0.0`
-- ESP-IDF: `v5.4.x`
-- RP2040 build system: PlatformIO, see `rp2040/README.md`
-
-`v1.1.0` upgrades the project from the older ESP-IDF 5.1-era codebase to ESP-IDF 5.4.x and improves the MQTT setup experience. The serial console now includes an `mqtthelp` command with concrete broker, topic, and payload examples.
-
-## Features
-
-- [x] [MQTT](#mqtt)
-- [x] Wi-Fi setup from the device screen
-- [x] MQTT broker configuration from the device screen
-- [x] MQTT broker/client configuration from the serial console
-- [x] Built-in sensor publishing: temperature, humidity, CO2, tVOC
-- [x] Home Assistant control widgets: switches, arc control, slider control
-- [ ] REST API
-- [ ] WebSocket
+Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) into a Home Assistant companion panel. The device connects to Wi-Fi, publishes built-in environmental sensor data over MQTT, and renders on-screen controls that Home Assistant can drive in both directions.
 
 <figure class="third">
     <img align="left" src="./assets/Home Assistant Data.png" width="240"/>
@@ -38,52 +10,139 @@ This firmware turns the SenseCAP Indicator into a Home Assistant companion panel
     <img align="center" src="./assets/mqtt-address-panel.png" width="240"/>
 </figure>
 
-## MQTT
+---
 
-The MQTT integration uses three fixed topics:
+## Table of Contents
 
-| Direction | Topic | Example payload |
-| --- | --- | --- |
-| Device sensor data | `indicator/sensor` | `{"temp":"23.5"}` |
-| Home Assistant control command | `indicator/switch/set` | `{"switch1":1}` |
-| Device control state | `indicator/switch/state` | `{"switch1":1}` |
+- [Hardware](#hardware)
+- [Features](#features)
+- [Architecture](#architecture)
+- [MQTT Protocol](#mqtt-protocol)
+- [Home Assistant Setup](#home-assistant-setup)
+- [Build & Flash](#build--flash)
+  - [ESP32S3 (main firmware)](#esp32s3-main-firmware)
+  - [RP2040 (coprocessor)](#rp2040-coprocessor)
+- [Console Commands](#console-commands)
+- [Project Layout](#project-layout)
+- [Configuration](#configuration)
+- [Code Autocompletion](#code-autocompletion)
+- [Version](#version)
 
-Supported sensor keys are `temp`, `humidity`, `co2`, and `tvoc`. Supported control keys are `switch1` through `switch8`.
+---
 
-### Configure MQTT
+## Hardware
 
-You can configure the MQTT broker in either place:
+The SenseCAP Indicator is a dual-MCU device:
 
-- On the device screen: open Settings, choose the MQTT broker page, enter the broker IP address, and confirm. The firmware stores it as `mqtt://<ip>:1883`.
-- From the serial console: use `setmqtt` for full broker/client configuration.
+| MCU | Role | Key resources |
+|-----|------|---------------|
+| **ESP32-S3** | Display, touch, Wi-Fi, MQTT, Home Assistant logic | 8 MB flash, PSRAM @ 120 MHz OCT mode, 240 MHz CPU |
+| **RP2040** | Sensor acquisition on Grove ports | Reads CO₂, tVOC, temperature, humidity; relays data to ESP32-S3 over UART |
 
-Useful serial commands:
+The two chips communicate over a COBS-framed UART link. All Grove sensor access goes through the RP2040; the ESP32-S3 never reads sensors directly.
 
-```text
-haconfig
-mqtthelp
-setmqtt -a 192.168.1.10 -c indicator-01 -u mqtt_user -p mqtt_password
-setmqtt --addr mqtt://192.168.1.10:1883
-setmqtt --addr mqtt://broker.emqx.io
+---
+
+## Features
+
+- [x] MQTT broker integration (configurable address, port, client ID, username, password)
+- [x] Built-in sensor publishing: temperature, humidity, CO₂ (SCD41), tVOC (SGP40/SHT41)
+- [x] Home Assistant control widgets: 6 binary switches + 2 numeric sliders
+- [x] Wi-Fi setup from the touchscreen (scan, select network, enter password)
+- [x] MQTT broker configuration from the touchscreen
+- [x] MQTT broker/client configuration from the serial console (`setmqtt`, `mqtthelp`)
+- [x] NVS-backed persistence for Wi-Fi credentials, MQTT config, and switch state
+- [x] Display brightness and sleep-mode controls
+- [ ] REST API
+- [ ] WebSocket
+
+---
+
+## Architecture
+
+### Dual-MCU split
+
+```
+┌─────────────────────────────────────────────────────┐
+│                     ESP32-S3                         │
+│                                                      │
+│  ┌──────────┐   ESP event   ┌──────────┐            │
+│  │  Model   │◄─────loop────►│   View   │            │
+│  │ (state,  │               │ (LVGL,   │            │
+│  │  NVS,    │               │  touch   │            │
+│  │  MQTT)   │               │  input)  │            │
+│  └────┬─────┘               └──────────┘            │
+│       │ UART / COBS                                  │
+└───────┼─────────────────────────────────────────────┘
+        │
+┌───────┼─────────────────────────────────────────────┐
+│       ▼          RP2040                              │
+│  Packet dispatch                                     │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
+│  │   SCD41    │  │   SGP40    │  │   SHT41    │    │
+│  │   (CO₂)   │  │  (tVOC)   │  │ (temp/hum) │    │
+│  └────────────┘  └────────────┘  └────────────┘    │
+└─────────────────────────────────────────────────────┘
 ```
 
-After `setmqtt` succeeds, the firmware saves the configuration to NVS and restarts the MQTT client automatically.
+### Model / View pattern
 
-The MQTT method is also covered in the Seeed wiki: [SenseCAP Indicator - Home Assistant Application Development](https://wiki.seeedstudio.com/SenseCAP_Indicator_Application_Home_Assistant/).
+Each application domain has a paired `*_model.c` and `*_view.c`:
 
-### Home Assistant Setup
+- **Model** — owns state, NVS reads/writes, MQTT publish/subscribe, RP2040 packet parsing.
+- **View** — owns all LVGL object updates, touch callbacks, and screen transitions.
 
-- Step 1: [Install Home Assistant](https://www.home-assistant.io/installation/)
-- Step 2: Install or enable an MQTT broker, such as Mosquitto.
-- Step 3: Add the MQTT integration in Home Assistant.
-- Step 4: Configure the Indicator to use the same broker address and credentials.
-- Step 5: Add the entities below to `configuration.yaml`.
-- Step 6: Restart Home Assistant and add the dashboard cards.
+Communication between model and view flows exclusively through the **ESP event loop** using typed event IDs and payloads defined in `main/view_data.h`. Neither side calls the other's functions directly.
 
-Add the following to your `configuration.yaml` file:
+SquareLine Studio-generated files in `main/ui/` are treated as assets. Custom logic goes in the `*_view.c` files, not in the generated screens.
+
+### UI screens
+
+| Screen | Purpose |
+|--------|---------|
+| `ui_screen_wifi` | Wi-Fi scan and connect |
+| `ui_screen_broker` | MQTT broker IP entry |
+| `ui_screen_ha_data` | Live sensor readings |
+| `ui_screen_ha_ctrl` | Switch and slider controls |
+| `ui_screen_ha_mix` | Combined sensor + control view |
+| `ui_screen_display` | Brightness and sleep settings |
+| `ui_screen_setting` | General settings menu |
+
+---
+
+## MQTT Protocol
+
+Three fixed topics carry all communication:
+
+| Direction | Topic | Example payload |
+|-----------|-------|-----------------|
+| Device → HA (sensors) | `indicator/sensor` | `{"temp":"23.5","humidity":"45","co2":"450","tvoc":"100"}` |
+| HA → Device (commands) | `indicator/switch/set` | `{"switch1":1,"switch5":50}` |
+| Device → HA (state echo) | `indicator/switch/state` | `{"switch1":1,"switch2":0}` |
+
+**Sensor keys:** `temp`, `humidity`, `co2`, `tvoc`
+
+**Control keys:**
+
+| Key | HA entity type | Range |
+|-----|---------------|-------|
+| `switch1`–`switch4`, `switch6`–`switch7` | Binary switch | `0` / `1` |
+| `switch5`, `switch8` | Numeric slider | integer value |
+
+---
+
+## Home Assistant Setup
+
+**Step 1 — MQTT broker.** Install and enable an MQTT broker (Mosquitto is the simplest choice) and add the MQTT integration in Home Assistant.
+
+**Step 2 — Configure the Indicator.** Point the device at the same broker (see [Console Commands](#console-commands) or use the on-screen broker settings page).
+
+**Step 3 — Add entities** to `configuration.yaml`:
+
+<details>
+<summary>Expand full <code>configuration.yaml</code> snippet</summary>
 
 ```yaml
-# Example configuration.yaml entry
 mqtt:
   sensor:
     - unique_id: indicator_temperature
@@ -177,8 +236,12 @@ mqtt:
       value_template: "{{ value_json.switch8 }}"
 ```
 
+</details>
 
-Add the following to the raw configuration editor of the dashboard:
+**Step 4 — Add a dashboard.** Paste this into the raw configuration editor:
+
+<details>
+<summary>Expand dashboard YAML</summary>
 
 ```yaml
 views:
@@ -219,107 +282,211 @@ views:
         title: Indicator control
         show_header_toggle: false
         state_color: true
-
 ```
 
- <img src="./assets/Home Assistant Dashboard.png" />
+</details>
 
+<img src="./assets/Home Assistant Dashboard.png" />
 
+See also the Seeed wiki: [SenseCAP Indicator — Home Assistant Application Development](https://wiki.seeedstudio.com/SenseCAP_Indicator_Application_Home_Assistant/).
 
-## Build and Flash
+---
 
-This branch is built with ESP-IDF `v5.4.x`. The local helper script defaults to `/Users/spencer/esp/v5.4.3/esp-idf` when `IDF_PATH` is not already set.
+## Build & Flash
 
-Build:
+### ESP32S3 (main firmware)
+
+**Prerequisites:** ESP-IDF v5.4.x. Install it under `$HOME/esp/v5.4.3/esp-idf` or set `IDF_PATH` before building.
 
 ```bash
+# Quick build via helper script (sets IDF_PATH automatically)
 sh build.sh
+
+# Or use the Python wrapper
+./fw build
+./fw flash          # detects port automatically
+./fw monitor
 ```
 
-Flash:
+**Manual steps:**
 
 ```bash
+# Source the IDF environment once per shell
 . "$HOME/esp/v5.4.3/esp-idf/export.sh"
-idf.py -p PORT -b 460800 flash
+
+idf.py build
+idf.py -p /dev/ttyUSB0 -b 460800 flash
+idf.py -p /dev/ttyUSB0 monitor   # Ctrl-] to exit
 ```
 
-Monitor:
+The application partition is 7 MB (`partitions.csv`). Total SenseCAP flash is 8 MB.
+
+Key `sdkconfig.defaults` settings (do not remove these):
+- `CONFIG_LV_MEM_CUSTOM=y` — required; removing it causes an LVGL freeze
+- PSRAM clock: 120 MHz OCT mode
+- CPU: 240 MHz, flash: QIO 120 MHz
+
+### RP2040 (coprocessor)
+
+The RP2040 firmware lives in `rp2040/` and is built with **PlatformIO** (Arduino core by Earle Philhower).
 
 ```bash
-idf.py -p PORT monitor
+cd rp2040
+
+# Build
+pio run
+
+# Upload (device must appear as /dev/cu.usbmodem*)
+pio run -t upload
+
+# Monitor at 115200 baud
+pio device monitor
 ```
 
-(To exit the serial monitor, type ``Ctrl-]``.)
+The RP2040 firmware is at version **v2.1.0**. You only need to reflash it if you are working on sensor protocol changes.
 
-See the [Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
+---
 
-## Code autocompletion
+## Console Commands
 
-The easiest way is to install [Clangd](https://github.com/clangd/clangd/releases) and [Clangd extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd) on VSCode.
+Connect at the device's baud rate and use these commands:
 
-When you build the project once, it'll have a `build` folder in which `compile_commands.json` will be generated. now you can have fun with Clangd.
+| Command | Description |
+|---------|-------------|
+| `mqtthelp` | Print broker, topic, and payload examples |
+| `haconfig` | Print the current MQTT/HA configuration |
+| `setmqtt -a <addr>` | Set broker address (e.g., `mqtt://192.168.1.10:1883`) |
+| `setmqtt -a <addr> -c <client-id> -u <user> -p <pass>` | Full broker configuration |
 
-# ESP-IDF / CMake / Eclipse / VScode  project for Seeed Studio SenseCAP Indicator development-device exported by SquareLine Studio
+**Examples:**
 
-## Prerequisites
+```text
+setmqtt -a 192.168.1.10 -c indicator-01 -u mqtt_user -p mqtt_password
+setmqtt --addr mqtt://192.168.1.10:1883
+setmqtt --addr mqtt://broker.emqx.io
+```
 
-General note: Please avoid folder-names and filenames containing non-ASCII (special/accented/foreign) characters for the installed tools and your exported projects. Some build-tools and terminals/OS-es don't handle those characters well or interpret them differently, which can cause issues during the build-process.
+After `setmqtt` succeeds, the configuration is saved to NVS and the MQTT client restarts automatically.
 
-- Get and install ESP-IDF toolchain and its dependencies.
-  [ESP-IDF Get started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html)
-  - Install ESP-IDF on Windows: [Description page](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/windows-setup.html)
-  - There's a ESP-related IDE too, made by Espressif, containing ESP-IDF, called Espressif-IDE which is based on Eclipse CDT. [Espressif-IDE](https://github.com/espressif/idf-eclipse-plugin/blob/master/docs/Espressif-IDE.md)
-    - Get an ESP-IDF 5.4.x offline installer or an Espressif-IDE installer that bundles ESP-IDF 5.4.x.
-    - Install it on your Windows system accepting all offered options and default settings. This automagically installs Python, git, CMake, etc all at once under C:\Espressif folder.
-    - You can start building in command-line from the PowerShell/CMD entries created in the start-menu, but with the help of the included build.bat you can build on a normal commandline too
-    - Or you can build the project in the IDE GUI, see 'Usage' section.
-  
-  - Install ESP-IDF on Linux/MacOS: [Description page](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/linux-macos-setup.html)
-    - Get Python3, git, cmake, ninja-build, wget, flex, bison, libusb, etc
-    - In a directory (preferably a created $HOME/esp) type `git clone --recursive https://github.com/espressif/esp-idf.git`
-      - (This gets the latest version into an 'esp-idf' subfolder. In ESP-IDF v5.0 a patch is needed to set PSRAM frequency to 120MHz.)
-    - In the esp-idf directory run `./install.sh`, then you can add ESP32S3 support (needed for SenseCAP indicator) by `./install.sh esp32s3`
-    - To use ESP-IDF ('idf.py') you need to type `. ./export.sh`, but it's only active in the current shell.
-      - (To call it in any shell later easily, add `alias get_idf='. $HOME/esp/esp-idf/export.sh'` to your .bashrc file, so a `get_idf` command will get the IDF environment temporarily.)
+---
 
+## Project Layout
 
-## Usage
+<details>
+<summary>Expand directory tree</summary>
 
-### Building the project and flashing to the device from command-line
-- On windows you should run the special command line which ESP-IDF created so you can use the upcoming commands. (There you can navigate into the project-folder.)
-- In this folder type `idf.py build` command to build the binaries for the SenseCAP indicator (in 'build' folder, a full `sdkconfig` file will be created if it didn't exist)
-  (If the compiled application .bin file doesn't fit into the 'app' partition a size-check error will follow. In this project the app partition is set to 7MB in 'partitions.csv' file, total flash of SenseCAP is 8MB)
-- To flash it to the device use `idf.py flash` command, after flashing or when switched on, it will start automatically. (If you issue this command first, it will build the project beforehand, if not already built.)
-- (To monitor the output of the running application you can use `idf.py monitor` command. It will restart the device. It can be used together with flashing: `idf.py flash monitor`. Press Control+] to exit the monitor-shell.)
-- (The SenseCAP device port is detected automatically, but you can specify it with -p <portname> argument, e.g. `idf.py -p /dev/ttyUSB0 monitor` or `idf.py -p COM6 flash`.)
+```
+.
+├── main/
+│   ├── main.c                   # Boot: bsp_init → lv_port_init → view_init → model_init
+│   ├── view_data.h              # Shared event IDs, payloads, sensor enums, Wi-Fi structs
+│   ├── home_assistant_config.h  # MQTT topics and HA entity config macros
+│   ├── lv_port.c/h              # LVGL FreeRTOS port (semaphore-locked rendering)
+│   ├── indicator_model.c        # Model layer boot sequencer
+│   ├── indicator_view.c         # View layer boot sequencer (SquareLine UI startup)
+│   │
+│   ├── app/                     # Application modules (model + view pairs)
+│   │   ├── indicator_wifi_*     # Wi-Fi scanning, connection, UI
+│   │   ├── indicator_ha_*       # HA entity sync, MQTT payload parsing, control state
+│   │   ├── indicator_mqtt.*     # MQTT lifecycle and event loop
+│   │   ├── indicator_sensor_*   # Sensor data cache and historical ring buffer
+│   │   ├── indicator_display_*  # Brightness and sleep mode UI
+│   │   ├── esp32_rp2040.*       # COBS UART ingress from RP2040
+│   │   ├── indicator_btn.*      # Physical button events (single/double/long press)
+│   │   ├── indicator_cmd.*      # Serial console command dispatch
+│   │   └── indicator_storage_nvs.* # NVS read/write helpers
+│   │
+│   ├── ui/                      # SquareLine-generated UI (treat as assets)
+│   │   ├── screens/             # Seven screen implementations
+│   │   ├── images/              # Compiled PNG icon resources
+│   │   └── fonts/               # LVGL font data
+│   │
+│   └── util/
+│       ├── cobs.*               # COBS encode/decode (RP2040 link protocol)
+│       └── indicator_util.*     # Miscellaneous helpers
+│
+├── components/
+│   ├── bsp/                     # Board support: LCD, touch, LED, buttons, I2C, audio
+│   ├── bus/                     # I2C/SPI bus abstraction
+│   ├── i2c_devices/             # Sensor drivers (SCD41, SGP40, SHT41, …)
+│   ├── iot_button/              # FreeRTOS button debounce and event driver
+│   ├── lora/                    # LoRa radio support (optional)
+│   └── lvgl/                    # LVGL graphics library
+│
+├── rp2040/                      # RP2040 PlatformIO project
+│   ├── src/main.cpp             # UART packet dispatch, command handler
+│   ├── src/sensors.cpp          # Sensor init and acquisition
+│   └── platformio.ini           # Build config (Arduino core, sensor libraries)
+│
+├── scripts/
+│   ├── fw.py                    # CLI wrapper: build / flash / monitor
+│   ├── dev_check.py             # Architecture scan + firmware build verification
+│   ├── architecture_scan.py     # Detects model/view boundary violations
+│   └── verify_rp2040_protocol.py # Validates RP2040 packet format
+│
+├── CMakeLists.txt
+├── sdkconfig.defaults           # Minimal ESP-IDF defaults (PSRAM, LVGL, CPU speed)
+├── partitions.csv               # 7 MB app partition layout
+├── build.sh / fw.bat            # Shell build helpers
+└── AGENTS.md                    # Architecture rules for AI agents and contributors
+```
 
-### Project customization
-- ESP-IDF uses 'menuconfig' to create the 'sdkconfig' (based on Kconfig) file which holds the whole configuration of the project (including detailed component settings), use the `idf.py menuconfig` command to start it
-  - (sdkconfig in an ESP-IDF project has LVGL-configuration in the 'Component config' subcategory and 'lv_conf.h' as such is no longer used to configure LVGL features.)
-- In this project all built-in ('montserrat') LVGL fonts are enabled. If you want to add/remove the LVGL built-infonts to select only the fonts your project needs look in submenu: Component config / LVGL configuration / Font usage / Enable built-in fonts.
-- Above ESP-IDF 5.0 the 120MHz speed option for the PSRAM (necessary for SenseCAP Indicator) is selectable (no patch needed) after enabling 'Make experimental features visible', and is enabled in submenu: Components / ESP PSRAM / SPI RAM config / Set RAM clock speed
-- Exit from menuconfig by Q and answer Y to save the modifications to file 'sdkconfig'.
-- (If you want a clean sdkconfig file containing only the modifications you can type `idf.py save-defconfig` to get it. The resulting `sdkconfig.defaults` file will be used if `sdkconfig` file is not found.)
-- (You can edit 'sdkconfig.defaults' directly by hand, and if you delete 'sdkconfig' and rebuild the project, it will be recreated. But please leave 'CONFIG_LV_MEM_CUSTOM=y' setting untouched, otherwise you might face a freeze.)
+</details>
 
+---
 
-## Alternative build-methods/tools
+## Configuration
 
-- Command-line CMake-based building works as well, but the above-mentioned 'export.sh' or 'get_idf' should be used beforehand to pull the IDF environment into the terminal,
-  - You need to create a 'build' folder (to avoid littering the project-folder), cd into it then type `cmake -G "Ninja" ..` to generate the files (or `cmake ..` for the slower 'Make' based build)
-  - When the makefile gets generated you can build it with `ninja -j 4` command ('-j 4' tells it to use 4 CPUs if possible) and flash with `ninja flash` command
-  - To make this easier there's a `build.sh` and `build.bat` file which does this plus cleans build-folder before every build, and then `flash.sh` or `flash.bat` uploads the program into the device.
-    - (You might need to edit the build.bat and flash.bat files and rewrite the version number to your installed ESP-IDF version for them to work.)
+### MQTT — on device
 
-- For GUI-based development Visual Studio Code and Eclipse-IDE basic project files are included too so you can build in these tools too, as the project files are based on CMake.
+Open **Settings → MQTT Broker** on the touchscreen. Enter the broker IP and confirm. The firmware stores the address as `mqtt://<ip>:1883`.
 
-  - Eclipse CDT has a plugin described at [Eclipse Marketplace ESP-IDF plugin](https://marketplace.eclipse.org/content/esp-idf-eclipse-plugin) and [ESP-IDF plugin github-page](https://github.com/espressif/idf-eclipse-plugin)
-    - In 'Help' / 'Install new software' submenu you can install 'Espressif IDF' from 'https://dl.espressif.com/dl/idf-eclipse-plugin/updates/latest/' by following the instructions
-  - (But if you installed Espressif-IDE in the 'Prerequisites' section this will probably be most compatible with ESP-IDF development.)
-    - Follow the instructions at the GitHub-page (browsing existing ESP-IDF folder when asked) and you'll get an Eclipse project environment to build and flash.
-    - To open your exported project-template, use menu File / Import, select 'Existing IDF Project' and select the project folder. Pressing Build (hammer) button will compile the project to .elf and .bin files in 'build' folder.
+### MQTT — serial console
 
-  - VScode has an Espressif-IDF extension that should be used, installable from within VScode.
-    - [Installation](https://github.com/espressif/vscode-esp-idf-extension/blob/master/docs/tutorial/install.md)
-    - [Basic Use](https://github.com/espressif/vscode-esp-idf-extension/blob/master/docs/tutorial/basic_use.md)
-  
+```text
+setmqtt -a 192.168.1.10 -c indicator-01 -u user -p pass
+```
+
+### Display
+
+Use the **Display** screen on the device to adjust brightness and configure screen sleep timeout.
+
+### sdkconfig
+
+Run `idf.py menuconfig` to explore all options. Notable locations:
+
+- **LVGL fonts** — `Component config → LVGL configuration → Font usage → Enable built-in fonts`
+- **PSRAM clock** — `Components → ESP PSRAM → SPI RAM config → Set RAM clock speed` (requires "Make experimental features visible")
+
+To regenerate a clean `sdkconfig` from defaults: delete `sdkconfig` and run `idf.py build`.
+
+---
+
+## Code Autocompletion
+
+Install [clangd](https://github.com/clangd/clangd/releases) and the [clangd VS Code extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd). After one successful build, `build/compile_commands.json` is generated and clangd uses it automatically for full ESP-IDF-aware completion and navigation.
+
+---
+
+## Version
+
+| Component | Version |
+|-----------|---------|
+| Firmware (ESP32-S3) | `v1.1.0` |
+| Coprocessor (RP2040) | `v2.1.0` |
+| ESP-IDF | `v5.4.x` |
+| RP2040 build system | PlatformIO |
+
+**Last commit:** `196e89f` — 2026-05-27 · refactor(tooling): unify build/flash into one cross-platform `./dev`
+
+`v1.1.0` upgrades the project from the ESP-IDF 5.1-era codebase to ESP-IDF 5.4.x and improves the MQTT setup experience. The serial console now includes an `mqtthelp` command with concrete broker, topic, and payload examples.
+
+<details>
+<summary>Full changelog</summary>
+
+| Version | Notes |
+|---------|-------|
+| `v1.1.0` | Upgraded to ESP-IDF 5.4.x; added `mqtthelp` console command; improved MQTT setup UX |
+| `v1.0.0` | Initial release (ESP-IDF 5.1 era) |
+
+</details>
