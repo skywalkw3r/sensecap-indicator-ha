@@ -4,15 +4,11 @@
 
  * @author Spencer Yan
  *
- * @note Description of the file
- *
  * @copyright © 2023, Seeed Studio
  */
 #include "esp32_rp2040.h"
 #include "cobs.h"
 #include "driver/uart.h"
-// #include "esp_timer.h"
-// #include "time.h"
 #include "view_data.h"
 #include <stdlib.h>
 #include <string.h>
@@ -29,15 +25,15 @@ static const char* TAG = "esp32_rp2040";
 #define ESP32_RP2040_COMM_TASK_STACK_SIZE (1024 * 4)
 #define BUF_SIZE						  (512)
 
-uint8_t buf[BUF_SIZE]; // recv
-uint8_t data[BUF_SIZE]; // decode
+static uint8_t buf[BUF_SIZE];
+static uint8_t data[BUF_SIZE];
 
 /**
  * @brief sensor data parse
  * @attention should be implemented in indicator_sensor_model.c
  */
-__attribute__((weak)) int __sensor_data_parse_handle(uint8_t* p_data, size_t len) {
-	ESP_LOGI(TAG, "__sensor_data_parse_handle, please import the code from indicator_sensor_model");
+__attribute__((weak)) int _sensor_data_parse_handle(uint8_t* p_data, size_t len) {
+	ESP_LOGI(TAG, "_sensor_data_parse_handle, please import the code from indicator_sensor_model");
 	return -1;
 }
 
@@ -49,7 +45,7 @@ __attribute__((weak)) int __sensor_data_parse_handle(uint8_t* p_data, size_t len
  * @param len
  * @return int
  */
-static int __cmd_send(uint8_t cmd, void* p_data, uint8_t len) {
+static int _cmd_send(uint8_t cmd, void* p_data, uint8_t len) {
 	uint8_t buf[40] = {0};
 	uint8_t data[32] = {0};
 
@@ -85,7 +81,7 @@ static int __cmd_send(uint8_t cmd, void* p_data, uint8_t len) {
 	return -1;
 }
 
-static bool __verify_xor_checksum(const uint8_t* p_data, size_t len) {
+static bool _verify_xor_checksum(const uint8_t* p_data, size_t len) {
 	if(len < 2)
 	{
 		return false;
@@ -99,8 +95,8 @@ static bool __verify_xor_checksum(const uint8_t* p_data, size_t len) {
 	return checksum == p_data[len - 1];
 }
 
-static bool __dynamic_sensor_packet_is_valid(const uint8_t* p_data, size_t len) {
-	if(len < 2 || !__verify_xor_checksum(p_data, len))
+static bool _dynamic_sensor_packet_is_valid(const uint8_t* p_data, size_t len) {
+	if(len < 2 || !_verify_xor_checksum(p_data, len))
 	{
 		return false;
 	}
@@ -130,7 +126,7 @@ static bool __dynamic_sensor_packet_is_valid(const uint8_t* p_data, size_t len) 
 	}
 }
 
-static bool __packet_handle(uint8_t* p_data, size_t len) {
+static bool _packet_handle(uint8_t* p_data, size_t len) {
 	if(len < 1)
 	{
 		return false;
@@ -141,7 +137,7 @@ static bool __packet_handle(uint8_t* p_data, size_t len) {
 		case PKT_TYPE_SENSOR_ATTACHED:
 		case PKT_TYPE_SENSOR_DETACHED:
 		case PKT_TYPE_SENSOR_VALUE:
-			if(!__dynamic_sensor_packet_is_valid(p_data, len))
+			if(!_dynamic_sensor_packet_is_valid(p_data, len))
 			{
 				ESP_LOGW(TAG, "drop malformed dynamic sensor packet type=0x%x len=%d", p_data[0],
 						 (int)len);
@@ -152,7 +148,7 @@ static bool __packet_handle(uint8_t* p_data, size_t len) {
 		default:
 			if(len > 1)
 			{
-				__sensor_data_parse_handle((uint8_t*)p_data, len);
+				_sensor_data_parse_handle((uint8_t*)p_data, len);
 				return true;
 			}
 			break;
@@ -178,7 +174,7 @@ static void esp32_rp2040_comm_task(void* arg) {
 	ESP_ERROR_CHECK(uart_set_pin(ESP32_COMM_PORT_NUM, ESP32_RP2040_TXD, ESP32_RP2040_RXD,
 								 ESP32_RP2040_RTS, ESP32_RP2040_CTS));
 
-	__cmd_send(PKT_TYPE_CMD_POWER_ON, NULL, 0);
+	_cmd_send(PKT_TYPE_CMD_POWER_ON, NULL, 0);
 	cobs_decode_result ret;
 	uint8_t frag[BUF_SIZE] = {0};
 	size_t frag_len = 0;
@@ -248,7 +244,7 @@ static void esp32_rp2040_comm_task(void* arg) {
 #endif
 						if(ret.status == COBS_DECODE_OK)
 						{
-							__packet_handle((uint8_t*)data, ret.out_len);
+							_packet_handle((uint8_t*)data, ret.out_len);
 						}
 					}
 					frag_len = 0;
@@ -260,21 +256,21 @@ static void esp32_rp2040_comm_task(void* arg) {
 	}
 }
 
-static void __sensor_shutdown(void) {
+static void _sensor_shutdown(void) {
 	int ret = 0;
-	ret = __cmd_send(PKT_TYPE_CMD_SHUTDOWN, NULL, 0);
+	ret = _cmd_send(PKT_TYPE_CMD_SHUTDOWN, NULL, 0);
 	if(ret <= 0)
 	{
 		ESP_LOGI(TAG, "sensor shutdown fail!. %d", ret);
 	}
 }
-static void __commu_event_handler(void* handler_args, esp_event_base_t base, int32_t id,
+static void _commu_event_handler(void* handler_args, esp_event_base_t base, int32_t id,
 								  void* event_data) {
 	switch(id)
 	{
 		case VIEW_EVENT_SHUTDOWN:
 			ESP_LOGI(TAG, "event: VIEW_EVENT_SHUTDOWN");
-			__sensor_shutdown();
+			_sensor_shutdown();
 			break;
 		default:
 			break;
@@ -286,5 +282,5 @@ void esp32_rp2040_init(void) {
 				NULL, 5, NULL);
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE,
 															 VIEW_EVENT_SHUTDOWN,
-															 __commu_event_handler, NULL, NULL));
+															 _commu_event_handler, NULL, NULL));
 }

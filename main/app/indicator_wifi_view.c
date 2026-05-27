@@ -18,7 +18,7 @@ static lv_obj_t* password_kb;
 static lv_obj_t* ui_password_input;
 static lv_obj_t* ui_wifi_connect_ret;
 
-static char __g_cur_wifi_ssid[32];
+static char _g_cur_wifi_ssid[32];
 
 static uint8_t password_ready = false;
 
@@ -67,7 +67,7 @@ static void event_wifi_connect_join(lv_event_t* e) {
 
 		if(ui_wifi_connecting != NULL)
 		{
-			strncpy((char*)cfg.ssid, (char*)__g_cur_wifi_ssid, sizeof(cfg.ssid));
+			strncpy((char*)cfg.ssid, (char*)_g_cur_wifi_ssid, sizeof(cfg.ssid));
 			ESP_LOGI(TAG, "ssid: %s", cfg.ssid);
 
 			ESP_LOGI(TAG, "lv_obj_del: ui_wifi_connecting");
@@ -241,7 +241,7 @@ static void event_wifi_connect(lv_event_t* e) {
 				{
 					have_password = true;
 				}
-				strncpy((char*)__g_cur_wifi_ssid, p_wifi_ssid, sizeof(__g_cur_wifi_ssid));
+				strncpy((char*)_g_cur_wifi_ssid, p_wifi_ssid, sizeof(_g_cur_wifi_ssid));
 				lv_obj_add_flag(lv_layer_top(), LV_OBJ_FLAG_CLICKABLE);
 				ui_wifi_connecting = create_wifi_connecting(lv_layer_top(), (const char*)p_wifi_ssid, have_password);
 				lv_obj_set_style_bg_opa(lv_layer_top(), LV_OPA_50, 0);
@@ -376,7 +376,7 @@ static void event_wifi_details(lv_event_t* e) {
 			{
 				p_wifi_ssid = lv_list_get_btn_text(ui_wifi_list, ta);
 
-				strncpy((char*)__g_cur_wifi_ssid, p_wifi_ssid, sizeof(__g_cur_wifi_ssid));
+				strncpy((char*)_g_cur_wifi_ssid, p_wifi_ssid, sizeof(_g_cur_wifi_ssid));
 				lv_obj_add_flag(lv_layer_top(), LV_OBJ_FLAG_CLICKABLE);
 				ui_wifi_connecting = ui_wifi_details(lv_layer_top(), (const char*)p_wifi_ssid);
 
@@ -468,7 +468,7 @@ static void wifi_list_init(void) {
 	lv_obj_add_flag(ui_wifi_list, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void __view_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data) {
+static void _view_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data) {
 	switch(id)
 	{
 		case VIEW_EVENT_SCREEN_START:
@@ -602,25 +602,25 @@ static void __view_event_handler(void* handler_args, esp_event_base_t base, int3
 
 int indicator_wifi_view_init(void) {
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_ST,
-															 __view_event_handler, NULL, NULL));
+															 _view_event_handler, NULL, NULL));
 
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST,
-															 __view_event_handler, NULL, NULL));
+															 _view_event_handler, NULL, NULL));
 
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_START, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_START, _view_event_handler, NULL, NULL));
 
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_CONNECT_RET, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_CONNECT_RET, _view_event_handler, NULL, NULL));
 
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST_START, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST_START, _view_event_handler, NULL, NULL));
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST_REQ, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST_REQ, _view_event_handler, NULL, NULL));
 
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_CONNECT, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_CONNECT, _view_event_handler, NULL, NULL));
 
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_CFG_DELETE, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_CFG_DELETE, _view_event_handler, NULL, NULL));
 }

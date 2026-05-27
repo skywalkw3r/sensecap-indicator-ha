@@ -55,7 +55,7 @@ static void         restore_data_task(void* args);
 instance_mqtt          mqtt_ha_instance;  // global entrance
 static instance_mqtt_t instance_ptr = &mqtt_ha_instance;
 
-static void ha_entites_init(void)
+static void ha_entities_init(void)
 {
     const char* sensor_keys[]         = CONFIG_SENSOR_VALUE_KEYS;
     const char* sensor_topics[]       = CONFIG_SENSOR_TOPICS;
@@ -100,36 +100,6 @@ static void ha_ctrl_cfg_save(void)
 static int mqtt_msg_handler(const char* p_topic, int topic_len, const char* p_data, int data_len)
 {
     cJSON* root = cJSON_ParseWithLength(p_data, data_len);
-    // if (root == NULL) {
-    //     ESP_LOGE(TAG, "Failed to parse JSON data");
-    //     return -1;
-    // }
-
-    // for (int i = 0; i < CONFIG_HA_SENSOR_ENTITY_NUM; i++) {
-    //     if (strncmp(p_topic, ha_sensor_entities[i].topic, topic_len) == 0) {
-    //         cJSON* cjson_item = cJSON_GetObjectItem(root, ha_sensor_entities[i].key);
-    //         if (cjson_item != NULL && cJSON_IsNumber(cjson_item)) {
-    //             struct view_data_ha_switch_data sensor_data = {.index = i, .value = cjson_item->valueint};
-    //             ESP_LOGI(TAG, "MQTT message: sensor %d is %d", i, sensor_data.value);
-    //             esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, &sensor_data, sizeof(sensor_data), portMAX_DELAY);
-    //             cJSON_Delete(root);
-    //             return 0;
-    //         }
-    //     }
-    // }
-
-    // for (int i = 0; i < CONFIG_HA_SWITCH_ENTITY_NUM; i++) {
-    //     if (strncmp(p_topic, ha_switch_entities[i].topic_set, topic_len) == 0) {  // The corresponding Topic then takes action
-    //         cJSON* cjson_item = cJSON_GetObjectItem(root, ha_switch_entities[i].key);
-    //         if (cjson_item != NULL && cJSON_IsNumber(cjson_item)) {
-    //             struct view_data_ha_switch_data switch_data = {.index = i, .value = cjson_item->valueint};
-    //             ESP_LOGI(TAG, "MQTT message: switch %d set to %d", i, switch_data.value);
-    //             esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SWITCH_SET, &switch_data, sizeof(switch_data), portMAX_DELAY);
-    //             cJSON_Delete(root);
-    //             return 0;
-    //         }
-    //     }
-    // }
     if (root == NULL || root->child == NULL || root->child->string == NULL) {
         ESP_LOGE(TAG, "Invalid JSON structure");
         return -1;
@@ -159,7 +129,6 @@ static int mqtt_msg_handler(const char* p_topic, int topic_len, const char* p_da
                     if (cjson_item != NULL && cJSON_IsString(cjson_item)) {
                         struct view_data_ha_sensor_data sensor_data = {.index = i};
                         strncpy(sensor_data.value, cjson_item->valuestring, sizeof(sensor_data.value) - 1);
-                        // sensor_data.value[sizeof(sensor_data.value) - 1] = '\0';  // Ensure null-termination
 
                         ESP_LOGI(TAG, "MQTT message: sensor %s is %s", ha_sensor_entities[i].key, sensor_data.value);
                         esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, &sensor_data, sizeof(sensor_data), portMAX_DELAY);
@@ -224,8 +193,6 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
             break;
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            // msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0,
-            // 0); ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_UNSUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
@@ -235,8 +202,8 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            printf("MQTT_EVENT_DATA: TOPIC=%.*s\r\n", event->topic_len, event->topic);
-            printf("MQTT_EVENT_DATA: DATA=%.*s\r\n", event->data_len, event->data);
+            ESP_LOGD(TAG, "MQTT_EVENT_DATA: TOPIC=%.*s", event->topic_len, event->topic);
+            ESP_LOGD(TAG, "MQTT_EVENT_DATA: DATA=%.*s", event->data_len, event->data);
             mqtt_msg_handler(event->topic, event->topic_len, event->data, event->data_len);
             break;
         case MQTT_EVENT_ERROR:
@@ -312,11 +279,8 @@ static void publish_switch_state(const struct view_data_ha_switch_data* switch_d
 
         if (len > 0 && len < MAX_DATA_BUF_LEN) {
             esp_mqtt_client_publish(instance_ptr->mqtt_client, switch_topics[switch_data->index], data_buf, len, 0, 0);
-
-            if (switch_data->index < CONFIG_HA_SWITCH_ENTITY_NUM) {
-                switch_state[switch_data->index] = switch_data->value;
-                ha_ctrl_cfg_save();  // save switch state to flash
-            }
+            switch_state[switch_data->index] = switch_data->value;
+            ha_ctrl_cfg_save();
         } else {
             ESP_LOGE(TAG, "Failed to format switch data");
         }
@@ -335,7 +299,7 @@ static void handle_wifi_status_change(const struct view_data_wifi_st* wifi_statu
     }
 }
 
-static void __view_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data)
+static void _view_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data)
 {
     switch (id) {
         case VIEW_EVENT_SENSOR_DATA:
@@ -360,7 +324,7 @@ static void __view_event_handler(void* handler_args, esp_event_base_t base, int3
 }
 
 /****************** MQTT client init ******************/
-static void __cfg_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data)
+static void _cfg_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data)
 {
     ha_cfg_interface* p_cfg = NULL;
     switch (id) {
@@ -377,13 +341,6 @@ static void __cfg_event_handler(void* handler_args, esp_event_base_t base, int32
             esp_err_t ret = esp_mqtt_client_stop(instance_ptr->mqtt_client);
             ret           = esp_mqtt_client_set_uri(instance_ptr->mqtt_client, broker_url);
             ret           = esp_mqtt_client_start(instance_ptr->mqtt_client);
-            // ESP_LOGI(TAG, "Broker address changed, reconnecting MQTT client");
-            // esp_event_post_to(mqtt_app_event_handle,
-            //                   MQTT_APP_EVENT_BASE,
-            //                   MQTT_APP_RESTART,
-            //                   &instance_ptr,
-            //                   sizeof(instance_mqtt_t),
-            //                   portMAX_DELAY);
             break;
         }
         default:
@@ -502,8 +459,7 @@ static void restore_data_task(void* args)
 
         ESP_LOGI(TAG, "Restored switch %d state: %d", i, switch_state[i]);
 
-        // Add a small delay to avoid sending events too quickly
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(50)); /* pacing: LVGL needs ~1 frame between state events */
     }
 
     ESP_LOGI(TAG, "Restore data task completed, deleting itself");
@@ -516,8 +472,8 @@ esp_event_loop_handle_t ha_cfg_event_handle;
 
 int indicator_ha_model_init(void)
 {
-    ha_ctrl_cfg_restore(); /* restore the widets status last time */
-    ha_entites_init(); /* define the entities, the ha data model */
+    ha_ctrl_cfg_restore();
+    ha_entities_init();
 
     esp_event_loop_args_t ha_event_task_args = {.queue_size = 5, .task_name = "ha_event_task", .task_priority = uxTaskPriorityGet(NULL), .task_stack_size = 4096, .task_core_id = tskNO_AFFINITY};
 
@@ -534,15 +490,15 @@ int indicator_ha_model_init(void)
                                        .mqtt_starter        = _mqtt_ha_start,
                                        .is_using            = true};
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(ha_cfg_event_handle, HA_CFG_EVENT_BASE, ESP_EVENT_ANY_ID, __cfg_event_handler, NULL, NULL)); /* 重启服务(会进行保存)，*/
+    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(ha_cfg_event_handle, HA_CFG_EVENT_BASE, ESP_EVENT_ANY_ID, _cfg_event_handler, NULL, NULL)); /* 重启服务(会进行保存)，*/
 
     /* monitor network status*/
-    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_ST, __view_event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_ST, _view_event_handler, NULL, NULL));
 
     /* obtain sensor data */
-    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SENSOR_DATA, __view_event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SENSOR_DATA, _view_event_handler, NULL, NULL));
     /* get screen widgets status */
-    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SWITCH_ST, __view_event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SWITCH_ST, _view_event_handler, NULL, NULL));
 
     esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_ADDR_DISPLAY, NULL, 0, portMAX_DELAY);
 }

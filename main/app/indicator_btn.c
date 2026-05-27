@@ -26,13 +26,13 @@ __attribute__((weak)) bool indicator_display_st_get(void) {
 	return st;
 }
 
-static void __factory_reset_callback(void* arg) {
+static void _factory_reset_callback(void* arg) {
 	ESP_ERROR_CHECK(nvs_flash_erase());
 	fflush(stdout);
 	esp_restart();
 }
 
-static void __btn_click_callback(void* arg) {
+static void _btn_click_callback(void* arg) {
 	bool st = 0;
 	if(sleep_flag)
 	{
@@ -64,17 +64,17 @@ static void __btn_click_callback(void* arg) {
 	}
 }
 
-static void __btn_double_click_callback(void* arg) {
+static void _btn_double_click_callback(void* arg) {
 	ESP_LOGI(TAG, "double click");
 }
 
-static void __btn_press_start_callback(void* arg) {
+static void _btn_press_start_callback(void* arg) {
 	ESP_LOGI(TAG, "press stasrt");
 	hold_cnt = 1500;
 	sleep_start_flag = false;
 }
 
-static void __btn_long_press_hold_callback(void* arg) {
+static void _btn_long_press_hold_callback(void* arg) {
 	static bool factory_reset_flag = false;
 	// ESP_LOGI(TAG, "long press hold");
 	//  default CONFIG_BUTTON_PERIOD_TIME_MS=5ms
@@ -111,7 +111,7 @@ static void __btn_long_press_hold_callback(void* arg) {
 		indicator_display_on();
 
 		const esp_timer_create_args_t timer_args = {
-			.callback = &__factory_reset_callback,
+			.callback = &_factory_reset_callback,
 			/* argument specified here will be passed to timer callback function */
 			.arg = (void*)factory_reset_timer_handle,
 			.name = "factory_reset"};
@@ -120,7 +120,7 @@ static void __btn_long_press_hold_callback(void* arg) {
 	}
 }
 
-static void __btn_press_up_callback(void* arg) {
+static void _btn_press_up_callback(void* arg) {
 	if(hold_cnt >= 3000 && hold_cnt < 15000)
 	{
 		// sleep
@@ -133,12 +133,12 @@ static void __btn_press_up_callback(void* arg) {
 }
 
 int indicator_btn_init(void) {
-	bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_SINGLE_CLICK, __btn_click_callback, NULL);
-	bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_DOUBLE_CLICK, __btn_double_click_callback,
+	bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_SINGLE_CLICK, _btn_click_callback, NULL);
+	bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_DOUBLE_CLICK, _btn_double_click_callback,
 							  NULL);
 	bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_START,
-							  __btn_press_start_callback, NULL);
+							  _btn_press_start_callback, NULL);
 	bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_HOLD,
-							  __btn_long_press_hold_callback, NULL);
-	bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_PRESS_UP, __btn_press_up_callback, NULL);
+							  _btn_long_press_hold_callback, NULL);
+	bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_PRESS_UP, _btn_press_up_callback, NULL);
 }

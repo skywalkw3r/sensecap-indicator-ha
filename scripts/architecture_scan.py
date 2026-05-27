@@ -60,13 +60,13 @@ OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, str], str] = {
         "main/app/indicator_btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_SINGLE_CLICK, __btn_click_callback, NULL);",
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_SINGLE_CLICK, _btn_click_callback, NULL);",
     ): "existing single-click button registration uses BSP callback API",
     (
         "main/app/indicator_btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_DOUBLE_CLICK, __btn_double_click_callback,",
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_DOUBLE_CLICK, _btn_double_click_callback,",
     ): "existing double-click button registration uses BSP callback API",
     (
         "main/app/indicator_btn.c",
@@ -84,7 +84,7 @@ OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, str], str] = {
         "main/app/indicator_btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_PRESS_UP, __btn_press_up_callback, NULL);",
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_PRESS_UP, _btn_press_up_callback, NULL);",
     ): "existing press-up button registration uses BSP callback API",
     (
         "main/view_data.h",

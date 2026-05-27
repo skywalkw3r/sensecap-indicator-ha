@@ -45,7 +45,7 @@ typedef struct {
 /**
  * @brief This utilizing a way to create a mqtt client simply
  * 
- * Send instance_mqtt to __app_event_handler
+ * Send instance_mqtt to _app_event_handler
  */
 typedef struct instance_mqtt instance_mqtt;
 typedef void (*MQTTStartFn)(instance_mqtt *instance); // Example function taking an int and returning void

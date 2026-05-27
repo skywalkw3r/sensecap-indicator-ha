@@ -150,7 +150,7 @@ static void update_switch_ui(int index, int value) {
 }
 
 
-static void __view_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data) {
+static void _view_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data) {
     lv_port_sem_take();
 
     switch (id) {
@@ -185,15 +185,15 @@ static void __view_event_handler(void* handler_args, esp_event_base_t base, int3
 int indicator_ha_view_init(void) {
 	// ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE,
 	// VIEW_EVENT_HA_SENSOR,
-	// 														 __view_event_handler, NULL, NULL));
+	// 														 _view_event_handler, NULL, NULL));
 
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SWITCH_SET, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SWITCH_SET, _view_event_handler, NULL, NULL));
 
-	/* __app_config_handler */
+	/* _app_config_handler */
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_MQTT_ADDR_CHANGED, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_MQTT_ADDR_CHANGED, _view_event_handler, NULL, NULL));
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
-		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_ADDR_DISPLAY, __view_event_handler, NULL, NULL));
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_ADDR_DISPLAY, _view_event_handler, NULL, NULL));
 }
 

@@ -40,13 +40,13 @@ typedef struct
 	// uint64_t     timeStamp; // 传感器数据的时间戳
 } SensorData;
 
-const char* getSensorName(const enum sensor_data_type type);
-float getSensorFloatValue(const enum sensor_data_type type);
-int getSensorIntValue(const enum sensor_data_type type);
+const char* get_sensor_name(const enum sensor_data_type type);
+float get_sensor_float_value(const enum sensor_data_type type);
+int get_sensor_int_value(const enum sensor_data_type type);
 
 SensorData* get_current_sensor_data(SensorData* data, enum sensor_data_type type);
 
-int UpdateSensorData(const enum sensor_data_type type, uint8_t* p_data);
+int update_sensor_data(const enum sensor_data_type type, uint8_t* p_data);
 void indicator_sensor_init(void);
 
 /* View */

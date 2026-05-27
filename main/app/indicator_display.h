@@ -31,7 +31,7 @@ int indicator_display_off(void);
 
 int indicator_display_sleep_restart(void);
 
-void __display_cfg_get(struct view_data_display* p_data);
+void _display_cfg_get(struct view_data_display* p_data);
 
 #ifdef __cplusplus
 }

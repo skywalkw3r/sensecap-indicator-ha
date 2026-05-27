@@ -8,7 +8,7 @@
 #include "view_data.h"
 #include <esp_log.h>
 
-// static void __brighness_cfg_event_cb(lv_event_t * e)
+// static void _brighness_cfg_event_cb(lv_event_t * e)
 void brighness_cfg_event_cb(lv_event_t* e) // Value changed
 {
 	lv_obj_t* slider = lv_event_get_target(e);
@@ -17,7 +17,7 @@ void brighness_cfg_event_cb(lv_event_t* e) // Value changed
 					  sizeof(value), portMAX_DELAY);
 }
 
-// static void __display_cfg_apply_event_cb(lv_event_t * e)
+// static void _display_cfg_apply_event_cb(lv_event_t * e)
 void display_cfg_apply_event_cb(lv_event_t* e) // defocused the textarea
 {
 	lv_obj_t* target = lv_event_get_target(e);
@@ -54,7 +54,7 @@ void display_cfg_apply_event_cb(lv_event_t* e) // defocused the textarea
 
 void brighness_update_callback(lv_event_t* e) {
 	struct view_data_display cfg;
-	__display_cfg_get(&cfg);
+	_display_cfg_get(&cfg);
 	lv_slider_set_value(ui_brighness_cfg, cfg.brightness, LV_ANIM_OFF);
 	if(cfg.sleep_mode_en)
 	{
