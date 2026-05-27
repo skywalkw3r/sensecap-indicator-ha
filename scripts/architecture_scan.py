@@ -91,6 +91,7 @@ MODEL_FILE_PATTERNS = (
 
 LVGL_CALL_RE = re.compile(r"\b(lv_[a-zA-Z0-9_]+)\s*\(")
 EVENT_ENUM_RE = re.compile(r"^\s*(VIEW_EVENT_[A-Z0-9_]+)\s*(?:=.*?)?,?\s*(?://\s*(.*))?$")
+MODEL_UI_INCLUDE_RE = re.compile(r"#\s*include\s*[<\"](?:ui/)?ui\.h[>\"]")
 SERVICE_CALLBACK_RE = re.compile(r"\b([a-zA-Z0-9_]+_register_(?:cb|callback))\s*\(")
 
 
@@ -147,7 +148,7 @@ def add_symbol_finding(
 def scan_model_ui_includes(path: Path, text: str, findings: list[Finding]) -> None:
     if not is_model_file(path):
         return
-    for match in re.finditer(r'#\s*include\s+"ui\.h"', text):
+    for match in MODEL_UI_INCLUDE_RE.finditer(text):
         add_finding(
             findings,
             path,
