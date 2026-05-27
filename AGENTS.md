@@ -49,7 +49,7 @@ View initialization starts SquareLine UI and view handlers. Model initialization
 | Display settings | `main/app/indicator_display_model.c`, `main/app/indicator_display_view.c` |
 | RP2040 UART ingress | `main/app/esp32_rp2040.c` |
 | Built-in sensor cache/parser | `main/app/indicator_sensor_model.c`, `main/app/indicator_sensor_view.c` |
-| Local development checks | `scripts/dev_check.py` |
+| Future local development checks | Later Stage 1: `scripts/dev_check.py` |
 
 ## Architecture Rules
 
