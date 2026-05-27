@@ -37,7 +37,6 @@ ALLOWLIST: set[tuple[str, str]] = set()
 
 
 ALLOWLIST_SUMMARY_ENTRIES: set[tuple[str, str]] = {
-    ("main/app/indicator_ha_model.c", "model-ui-include"),
     ("main/view_data.h", "shared-bsp-include"),
 }
 
@@ -50,12 +49,6 @@ SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
 
 
 OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, str], str] = {
-    (
-        "main/app/indicator_ha_model.c",
-        "model-ui-include",
-        "ui.h",
-        '#include "ui.h"',
-    ): "existing Home Assistant model directly includes generated SquareLine UI",
     (
         "main/app/indicator_btn.c",
         "service-register-callback",
@@ -120,6 +113,7 @@ EVENT_COMMENT_ALLOWLIST_REASONS: dict[str, str] = {
 VIEW_FILE_PATTERNS = (
     re.compile(r"(^|/)indicator_.*_view\.c$"),
     re.compile(r"(^|/)indicator_view\.c$"),
+    re.compile(r"(^|/)ha/ha_(?:config|switch)\.c$"),
     re.compile(r"(^|/)lv_port\.[ch]$"),
     re.compile(r"(^|/)ui(/|$)"),
 )
