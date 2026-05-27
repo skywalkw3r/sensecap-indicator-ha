@@ -22,22 +22,24 @@
 - [ ] **main/app/ 架构整理** — 当前遗留问题：
   - 6 个空 stub .c 文件（indicator_wifi_model/view、sensor_model/view、display_model/view）
   - 4 个 shim .h 文件（indicator_wifi/sensor/display/ha）
-  - 真正属于 app 层的模块：btn、cmd、mqtt、storage、rp2040
-  - 需要决策：这些模块是否需要垂直切片，还是保留在 app 层？
-  - Codex 架构检查结论待输出 → 见下方
+  - 剩余待迁移模块：btn、cmd、mqtt、storage
+  - rp2040 已迁移至 main/rp2040/ ✓
 
-- [ ] **Build 问题修复**
-  - indicator_display.h / indicator_sensor.h shim 缺 include guard（已修复 2026-05-27）
-  - 需用 ESP-IDF 环境完整编译验证（idf.py 未激活时无法 build）
-  - 用户需运行：`. $IDF_PATH/export.sh` 然后 `python3 scripts/dev_check.py`
+- [x] **Build 问题修复**（2026-05-27）
+  - indicator_display.h / indicator_sensor.h shim guard 碰撞已修复
+  - wifi_model.c 补充 esp_wifi.h / esp_netif.h 已修复
+  - fullclean build 通过 ✓
 
 ---
 
 ## 待办
 
-- [ ] **Codex 架构检查** — 检查 main/app/ 剩余模块，给出重构方案
-  - 关注点：mqtt（共享总线）、btn（全局 GPIO）、rp2040（UART/COBS）是否适合切片
-  - 目标：让每个 Agent 的改动 blast radius 最小
+- [ ] **app/ 剩余模块迁移**（逐步，每步 fullclean build 验证）
+  - [ ] mqtt → main/mqtt/
+  - [ ] btn → main/btn/
+  - [ ] storage → main/storage/
+  - [ ] cmd → main/cmd/
+- [x] rp2040 → main/rp2040/（2026-05-27，build 通过）
 
 - [ ] **Phase 1** — LVGL v9 + ESP Component Manager
   - 用 `idf_component.yml` 替换本地 components/lvgl/
