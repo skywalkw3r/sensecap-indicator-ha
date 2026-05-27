@@ -196,5 +196,7 @@ int indicator_ha_model_init(void)
 int indicator_ha_view_init(void)
 {
     ha_config_view_init();
+    ha_switch_screen_t *screen = ha_switch_screen_create();
+    ha_switch_attach_screen(screen);
     return ESP_OK;
 }

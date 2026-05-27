@@ -1,15 +1,13 @@
 #include "ha.h"
+#include "ha_switch_screen.h"
 #include "home_assistant_config.h"
 #include "cJSON.h"
 #include "indicator_storage_nvs.h"
 #include "lv_port.h"
-#include "ui.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "misc/lv_anim.h"
-#include "widgets/lv_slider.h"
 
 #define HA_CFG_STORAGE "ha-cfg"
 #define MAX_DATA_BUF_LEN 64
@@ -27,6 +25,7 @@ typedef struct ha_switch_entity {
 static ha_switch_entity_t ha_switch_entities[CONFIG_HA_SWITCH_ENTITY_NUM];
 static int switch_state[CONFIG_HA_SWITCH_ENTITY_NUM];
 static TaskHandle_t restore_task_handle = NULL;
+static ha_switch_screen_t *_screen = NULL;
 
 static void ha_ctrl_cfg_restore(void)
 {
@@ -76,55 +75,9 @@ static void publish_switch_state(const struct view_data_ha_switch_data *switch_d
     }
 }
 
-static void update_switch_ui(int index, int value)
+void ha_switch_attach_screen(ha_switch_screen_t *screen)
 {
-    lv_obj_t *target = NULL;
-    switch (index) {
-        case 0: target = ui_switch1; break;
-        case 1: target = ui_switch2; break;
-        case 2: target = ui_switch3; break;
-        case 3: target = ui_switch4; break;
-        case 4: target = ui_switch5_arc1; break;
-        case 5: target = ui_switch6; break;
-        case 6: target = ui_switch7; break;
-        case 7: target = ui_switch8_slider1; break;
-        default:
-            ESP_LOGW(TAG, "Invalid switch index: %d", index);
-            return;
-    }
-
-    if (target == NULL) {
-        ESP_LOGW(TAG, "Target object is NULL for index: %d", index);
-        return;
-    }
-
-    ESP_LOGI(TAG, "update_switch_ui index:%d value: %d", index, value);
-
-    switch (index) {
-        case 0:
-        case 1:
-        case 2:
-        case 3:
-        case 5:
-        case 6:
-            if (value) {
-                lv_obj_add_state(target, LV_STATE_CHECKED);
-            } else {
-                lv_obj_clear_state(target, LV_STATE_CHECKED);
-            }
-            break;
-        case 4: {
-            char buf[_UI_TEMPORARY_STRING_BUFFER_SIZE];
-            lv_snprintf(buf, sizeof(buf), "%d °C", value);
-            lv_label_set_text(ui_switch5_arc_data1, buf);
-            lv_arc_set_value(target, value);
-            break;
-        }
-        case 7:
-            lv_slider_set_value(target, value, LV_ANIM_ON);
-            break;
-    }
-    lv_event_send(target, LV_EVENT_VALUE_CHANGED, NULL);
+    _screen = screen;
 }
 
 static void restore_data_task(void *args)
@@ -153,11 +106,13 @@ static void view_event_handler(void *handler_args, esp_event_base_t base, int32_
             publish_switch_state((struct view_data_ha_switch_data *)event_data);
             break;
         case VIEW_EVENT_HA_SWITCH_SET: {
-            struct view_data_ha_switch_data *p_data = (struct view_data_ha_switch_data *)event_data;
-            ESP_LOGI(TAG, "VIEW_EVENT_HA_SWITCH_SET: switch index:%d value:%d\n", p_data->index, p_data->value);
-            lv_port_sem_take();
-            update_switch_ui(p_data->index, p_data->value);
-            lv_port_sem_give();
+            struct view_data_ha_switch_data *p = (struct view_data_ha_switch_data *)event_data;
+            ESP_LOGI(TAG, "VIEW_EVENT_HA_SWITCH_SET: switch index:%d value:%d\n", p->index, p->value);
+            if (_screen) {
+                lv_port_sem_take();
+                ha_switch_screen_update(_screen, p->index, p->value);
+                lv_port_sem_give();
+            }
             break;
         }
         default:

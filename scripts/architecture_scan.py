@@ -45,6 +45,12 @@ SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
     ("main/main.c", "lvgl-outside-view", "lv_port_init"): (
         "existing boot sequence intentionally initializes the LVGL port from app_main"
     ),
+    ("main/ha/ha_switch.c", "lvgl-outside-view", "lv_port_sem_take"): (
+        "HA switch controller must hold the LVGL port semaphore before updating its screen component"
+    ),
+    ("main/ha/ha_switch.c", "lvgl-outside-view", "lv_port_sem_give"): (
+        "HA switch controller releases the LVGL port semaphore after updating its screen component"
+    ),
 }
 
 
@@ -113,7 +119,8 @@ EVENT_COMMENT_ALLOWLIST_REASONS: dict[str, str] = {
 VIEW_FILE_PATTERNS = (
     re.compile(r"(^|/)indicator_.*_view\.c$"),
     re.compile(r"(^|/)indicator_view\.c$"),
-    re.compile(r"(^|/)ha/ha_(?:config|switch)\.c$"),
+    re.compile(r"(^|/)ha/ha_config\.c$"),
+    re.compile(r"(^|/)ha/ha_.*_screen\.c$"),
     re.compile(r"(^|/)lv_port\.[ch]$"),
     re.compile(r"(^|/)ui(/|$)"),
 )

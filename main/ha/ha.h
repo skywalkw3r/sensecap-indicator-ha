@@ -3,6 +3,7 @@
 
 #include "view_data.h"
 #include "indicator_mqtt.h"
+#include "ha_switch_screen.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,6 +36,7 @@ int indicator_ha_view_init(void);
 
 void ha_sensor_init(void);
 void ha_switch_init(void);
+void ha_switch_attach_screen(ha_switch_screen_t *screen);
 void ha_config_view_init(void);
 
 void ha_sensor_subscribe(esp_mqtt_client_handle_t client);
