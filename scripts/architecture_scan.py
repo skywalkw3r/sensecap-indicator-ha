@@ -34,11 +34,18 @@ class Finding:
 # Keep this small. Each entry is current debt that Stage 1 documents but does
 # not fix. New code should not be added here without a written reason.
 ALLOWLIST: set[tuple[str, str]] = {
-    # app_main currently owns the boot-time lv_port_init() call. Stage 1 records
-    # this boot sequence shape without moving runtime initialization code.
-    ("main/main.c", "lvgl-outside-view"),
     ("main/app/indicator_ha_model.c", "model-ui-include"),
     ("main/view_data.h", "shared-bsp-include"),
+}
+
+
+SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
+    ("main/app/indicator_btn.c", "service-register-callback", "bsp_btn_register_callback"): (
+        "existing button service uses BSP callback registration"
+    ),
+    ("main/main.c", "lvgl-outside-view", "lv_port_init"): (
+        "existing boot sequence intentionally initializes the LVGL port from app_main"
+    ),
 }
 
 
@@ -82,8 +89,9 @@ MODEL_FILE_PATTERNS = (
 )
 
 
-LVGL_CALL_RE = re.compile(r"\blv_[a-zA-Z0-9_]+\s*\(")
+LVGL_CALL_RE = re.compile(r"\b(lv_[a-zA-Z0-9_]+)\s*\(")
 EVENT_ENUM_RE = re.compile(r"^\s*(VIEW_EVENT_[A-Z0-9_]+)\s*(?:=.*?)?,?\s*(?://\s*(.*))?$")
+SERVICE_CALLBACK_RE = re.compile(r"\b([a-zA-Z0-9_]+_register_(?:cb|callback))\s*\(")
 
 
 def rel_key(path: Path) -> str:
@@ -92,6 +100,10 @@ def rel_key(path: Path) -> str:
 
 def is_allowlisted(path: Path, rule: str) -> bool:
     return (rel_key(path), rule) in ALLOWLIST
+
+
+def is_symbol_allowlisted(path: Path, rule: str, symbol: str) -> bool:
+    return (rel_key(path), rule, symbol) in SYMBOL_ALLOWLIST_REASONS
 
 
 def iter_source_files() -> list[Path]:
@@ -125,6 +137,13 @@ def add_finding(findings: list[Finding], path: Path, line: int, rule: str, messa
         findings.append(Finding(path, line, rule, message))
 
 
+def add_symbol_finding(
+    findings: list[Finding], path: Path, line: int, rule: str, symbol: str, message: str
+) -> None:
+    if not is_symbol_allowlisted(path, rule, symbol):
+        add_finding(findings, path, line, rule, message)
+
+
 def scan_model_ui_includes(path: Path, text: str, findings: list[Finding]) -> None:
     if not is_model_file(path):
         return
@@ -142,11 +161,13 @@ def scan_lvgl_calls(path: Path, text: str, findings: list[Finding]) -> None:
     if is_view_file(path):
         return
     for match in LVGL_CALL_RE.finditer(text):
-        add_finding(
+        symbol = match.group(1)
+        add_symbol_finding(
             findings,
             path,
             line_number(text, match.start()),
             "lvgl-outside-view",
+            symbol,
             "LVGL calls belong in view/UI files or the LVGL port layer",
         )
 
@@ -188,12 +209,14 @@ def scan_event_payload_comments(path: Path, text: str, findings: list[Finding]) 
 
 
 def scan_service_callbacks(path: Path, text: str, findings: list[Finding]) -> None:
-    for match in re.finditer(r"\b[a-zA-Z0-9_]+_register_cb\s*\(", text):
-        add_finding(
+    for match in SERVICE_CALLBACK_RE.finditer(text):
+        symbol = match.group(1)
+        add_symbol_finding(
             findings,
             path,
             line_number(text, match.start()),
             "service-register-callback",
+            symbol,
             "prefer the shared event loop over service-local callback registration",
         )
 
@@ -218,6 +241,8 @@ def main() -> int:
     if args.list_allowlist:
         for path, rule in sorted(ALLOWLIST):
             print(f"{path}: {rule}")
+        for (path, rule, symbol), reason in sorted(SYMBOL_ALLOWLIST_REASONS.items()):
+            print(f"{path}: {rule}: {symbol}: {reason}")
         for event, reason in sorted(EVENT_COMMENT_ALLOWLIST_REASONS.items()):
             print(f"{event}: event-payload-comment: {reason}")
         return 0
