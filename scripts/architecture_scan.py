@@ -49,54 +49,47 @@ SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
 }
 
 
-OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, int, str], str] = {
+OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, str], str] = {
     (
         "main/app/indicator_ha_model.c",
         "model-ui-include",
         "ui.h",
-        11,
         '#include "ui.h"',
     ): "existing Home Assistant model directly includes generated SquareLine UI",
     (
         "main/app/indicator_btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        136,
         "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_SINGLE_CLICK, __btn_click_callback, NULL);",
     ): "existing single-click button registration uses BSP callback API",
     (
         "main/app/indicator_btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        137,
         "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_DOUBLE_CLICK, __btn_double_click_callback,",
     ): "existing double-click button registration uses BSP callback API",
     (
         "main/app/indicator_btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        139,
         "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_START,",
     ): "existing long-press-start button registration uses BSP callback API",
     (
         "main/app/indicator_btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        141,
         "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_HOLD,",
     ): "existing long-press-hold button registration uses BSP callback API",
     (
         "main/app/indicator_btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        143,
         "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_PRESS_UP, __btn_press_up_callback, NULL);",
     ): "existing press-up button registration uses BSP callback API",
     (
         "main/view_data.h",
         "shared-bsp-include",
         "bsp_board.h",
-        10,
         "#include <bsp_board.h>",
     ): "existing shared view data header depends on board-level screen constants",
 }
@@ -160,7 +153,8 @@ def is_symbol_allowlisted(path: Path, rule: str, symbol: str) -> bool:
 
 
 def is_occurrence_allowlisted(path: Path, line: int, rule: str, symbol: str, line_text: str) -> bool:
-    return (rel_key(path), rule, symbol, line, line_text.strip()) in OCCURRENCE_ALLOWLIST_REASONS
+    del line
+    return (rel_key(path), rule, symbol, line_text.strip()) in OCCURRENCE_ALLOWLIST_REASONS
 
 
 def iter_source_files() -> list[Path]:
@@ -326,10 +320,10 @@ def main() -> int:
             print(f"{path}: {rule}")
         for (path, rule, symbol), reason in sorted(SYMBOL_ALLOWLIST_REASONS.items()):
             print(f"{path}: {rule}: {symbol}: {reason}")
-        for (path, rule, symbol, line, line_text), reason in sorted(
+        for (path, rule, symbol, line_text), reason in sorted(
             OCCURRENCE_ALLOWLIST_REASONS.items()
         ):
-            print(f"{path}:{line}: {rule}: {symbol}: {line_text}: {reason}")
+            print(f"{path}: {rule}: {symbol}: {line_text}: {reason}")
         for event, reason in sorted(EVENT_COMMENT_ALLOWLIST_REASONS.items()):
             print(f"{event}: event-payload-comment: {reason}")
         return 0
