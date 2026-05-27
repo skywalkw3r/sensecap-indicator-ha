@@ -20,7 +20,7 @@ Use these starter ideas:
 - Small verification scripts.
 - A path toward no-hardware checks.
 
-Do not copy starter BSP/display/touch/RP2040 driver code into this project unless a later scoped test proves a specific replacement is necessary. This repository's working firmware behavior is the source of truth.
+Do not import starter BSP/display/touch/RP2040 driver code into this project unless a later scoped test proves a specific replacement is necessary. This repository's working firmware behavior is the source of truth.
 
 ## Boot Sequence
 
