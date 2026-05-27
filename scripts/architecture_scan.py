@@ -123,6 +123,7 @@ VIEW_FILE_PATTERNS = (
     re.compile(r"(^|/)ha/ha_.*_screen\.c$"),
     re.compile(r"(^|/)wifi/wifi_view\.c$"),
     re.compile(r"(^|/)wifi/wifi_.*_screen\.c$"),
+    re.compile(r"(^|/)sensor/sensor_view\.c$"),
     re.compile(r"(^|/)lv_port\.[ch]$"),
     re.compile(r"(^|/)ui(/|$)"),
 )
