@@ -35,17 +35,59 @@ class Finding:
 # not fix. New code should not be added here without a written reason.
 ALLOWLIST: set[tuple[str, str]] = {
     ("main/app/indicator_ha_model.c", "model-ui-include"),
-    ("main/view_data.h", "shared-bsp-include"),
 }
 
 
 SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
-    ("main/app/indicator_btn.c", "service-register-callback", "bsp_btn_register_callback"): (
-        "existing button service uses BSP callback registration"
-    ),
     ("main/main.c", "lvgl-outside-view", "lv_port_init"): (
         "existing boot sequence intentionally initializes the LVGL port from app_main"
     ),
+}
+
+
+OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, int, str], str] = {
+    (
+        "main/app/indicator_btn.c",
+        "service-register-callback",
+        "bsp_btn_register_callback",
+        136,
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_SINGLE_CLICK, __btn_click_callback, NULL);",
+    ): "existing single-click button registration uses BSP callback API",
+    (
+        "main/app/indicator_btn.c",
+        "service-register-callback",
+        "bsp_btn_register_callback",
+        137,
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_DOUBLE_CLICK, __btn_double_click_callback,",
+    ): "existing double-click button registration uses BSP callback API",
+    (
+        "main/app/indicator_btn.c",
+        "service-register-callback",
+        "bsp_btn_register_callback",
+        139,
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_START,",
+    ): "existing long-press-start button registration uses BSP callback API",
+    (
+        "main/app/indicator_btn.c",
+        "service-register-callback",
+        "bsp_btn_register_callback",
+        141,
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_HOLD,",
+    ): "existing long-press-hold button registration uses BSP callback API",
+    (
+        "main/app/indicator_btn.c",
+        "service-register-callback",
+        "bsp_btn_register_callback",
+        143,
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_PRESS_UP, __btn_press_up_callback, NULL);",
+    ): "existing press-up button registration uses BSP callback API",
+    (
+        "main/view_data.h",
+        "shared-bsp-include",
+        "bsp_board.h",
+        10,
+        "#include <bsp_board.h>",
+    ): "existing shared view data header depends on board-level screen constants",
 }
 
 
@@ -92,6 +134,7 @@ MODEL_FILE_PATTERNS = (
 LVGL_CALL_RE = re.compile(r"\b(lv_[a-zA-Z0-9_]+)\s*\(")
 EVENT_ENUM_RE = re.compile(r"^\s*(VIEW_EVENT_[A-Z0-9_]+)\s*(?:=.*?)?,?\s*(?://\s*(.*))?$")
 MODEL_UI_INCLUDE_RE = re.compile(r"#\s*include\s*[<\"](?:ui/)?ui\.h[>\"]")
+BSP_INCLUDE_RE = re.compile(r"#\s*include\s+[<\"](bsp_[^>\"]+)[>\"]")
 SERVICE_CALLBACK_RE = re.compile(r"\b([a-zA-Z0-9_]+_register_(?:cb|callback))\s*\(")
 
 
@@ -105,6 +148,10 @@ def is_allowlisted(path: Path, rule: str) -> bool:
 
 def is_symbol_allowlisted(path: Path, rule: str, symbol: str) -> bool:
     return (rel_key(path), rule, symbol) in SYMBOL_ALLOWLIST_REASONS
+
+
+def is_occurrence_allowlisted(path: Path, line: int, rule: str, symbol: str, line_text: str) -> bool:
+    return (rel_key(path), rule, symbol, line, line_text.strip()) in OCCURRENCE_ALLOWLIST_REASONS
 
 
 def iter_source_files() -> list[Path]:
@@ -145,6 +192,19 @@ def add_symbol_finding(
         add_finding(findings, path, line, rule, message)
 
 
+def add_occurrence_finding(
+    findings: list[Finding],
+    path: Path,
+    line: int,
+    rule: str,
+    symbol: str,
+    line_text: str,
+    message: str,
+) -> None:
+    if not is_occurrence_allowlisted(path, line, rule, symbol, line_text):
+        add_symbol_finding(findings, path, line, rule, symbol, message)
+
+
 def scan_model_ui_includes(path: Path, text: str, findings: list[Finding]) -> None:
     if not is_model_file(path):
         return
@@ -177,12 +237,17 @@ def scan_shared_bsp_includes(path: Path, text: str, findings: list[Finding]) -> 
     rel = rel_key(path)
     if rel not in {"main/view_data.h"} and not rel.endswith("app_events.h"):
         return
-    for match in re.finditer(r"#\s*include\s+[<\"]bsp_", text):
-        add_finding(
+    for match in BSP_INCLUDE_RE.finditer(text):
+        include_name = match.group(1)
+        line = line_number(text, match.start())
+        line_text = text.splitlines()[line - 1]
+        add_occurrence_finding(
             findings,
             path,
-            line_number(text, match.start()),
+            line,
             "shared-bsp-include",
+            include_name,
+            line_text,
             "shared event/data headers should not depend on BSP headers",
         )
 
@@ -212,12 +277,15 @@ def scan_event_payload_comments(path: Path, text: str, findings: list[Finding]) 
 def scan_service_callbacks(path: Path, text: str, findings: list[Finding]) -> None:
     for match in SERVICE_CALLBACK_RE.finditer(text):
         symbol = match.group(1)
-        add_symbol_finding(
+        line = line_number(text, match.start())
+        line_text = text.splitlines()[line - 1]
+        add_occurrence_finding(
             findings,
             path,
-            line_number(text, match.start()),
+            line,
             "service-register-callback",
             symbol,
+            line_text,
             "prefer the shared event loop over service-local callback registration",
         )
 
@@ -244,6 +312,10 @@ def main() -> int:
             print(f"{path}: {rule}")
         for (path, rule, symbol), reason in sorted(SYMBOL_ALLOWLIST_REASONS.items()):
             print(f"{path}: {rule}: {symbol}: {reason}")
+        for (path, rule, symbol, line, line_text), reason in sorted(
+            OCCURRENCE_ALLOWLIST_REASONS.items()
+        ):
+            print(f"{path}:{line}: {rule}: {symbol}: {line_text}: {reason}")
         for event, reason in sorted(EVENT_COMMENT_ALLOWLIST_REASONS.items()):
             print(f"{event}: event-payload-comment: {reason}")
         return 0
