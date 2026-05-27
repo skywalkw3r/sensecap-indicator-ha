@@ -38,6 +38,11 @@ ALLOWLIST: set[tuple[str, str]] = {
 }
 
 
+ALLOWLIST_SUMMARY_ENTRIES: set[tuple[str, str]] = {
+    ("main/view_data.h", "shared-bsp-include"),
+}
+
+
 SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
     ("main/main.c", "lvgl-outside-view", "lv_port_init"): (
         "existing boot sequence intentionally initializes the LVGL port from app_main"
@@ -309,7 +314,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.list_allowlist:
-        for path, rule in sorted(ALLOWLIST):
+        for path, rule in sorted(ALLOWLIST | ALLOWLIST_SUMMARY_ENTRIES):
             print(f"{path}: {rule}")
         for (path, rule, symbol), reason in sorted(SYMBOL_ALLOWLIST_REASONS.items()):
             print(f"{path}: {rule}: {symbol}: {reason}")
