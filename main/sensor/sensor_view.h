@@ -1,6 +1,8 @@
 #ifndef SENSOR_VIEW_H
 #define SENSOR_VIEW_H
 
+#include "nav.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
