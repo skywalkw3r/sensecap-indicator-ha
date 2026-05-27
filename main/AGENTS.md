@@ -39,14 +39,16 @@ main/
   idf_component.yml   ESP Component Manager 依赖声明
 ```
 
-每个域的结构：
+域的文件命名因域而异，没有统一的 `<domain>_view.c` 规律。实际示例：
 ```
-main/<domain>/
-  <domain>.h          公共接口（model init 等）
-  <domain>.c          业务逻辑
-  <domain>_view.h     视图接口
-  <domain>_view.c     LVGL 控件创建 + 事件处理
+main/ha/        ha.h, ha_mqtt.c, ha_sensor.c, ha_switch_screen.c, ha_config.c
+main/wifi/      wifi.h, wifi_model.c, wifi_view.c, wifi_list_screen.c, wifi_connect_screen.c
+main/sensor/    sensor_model.h, sensor_model.c, sensor_view.h, sensor_view.c
+main/display/   display.h, display_model.c, display_view.h, display_view.c
+main/nav/       nav.h, nav.c
+main/assets/    ui_img_*.c, ui_font_*.c（图像/字体资源）
 ```
+共同规律：`*_view.c` 只做 LVGL 控件操作；model/业务逻辑在其他 `.c` 文件中。
 
 ---
 
@@ -76,14 +78,19 @@ main/<domain>/
 #define NAV_TILE_COUNT    4   // ← 必须同步 +1，否则 tile 显示空白
 ```
 
-**Step 2** — 新建域目录和两个文件：
+**Step 2** — `main/CMakeLists.txt` 的 `DIRECTORIES_TO_INCLUDE` 列表加入新目录：
+```cmake
+set(DIRECTORIES_TO_INCLUDE "util" "ha" "wifi" ... "my_page")
+#                                                    ^^^^^^^^ 新增
+```
+⚠️ 不加此行，新目录下的 `.c` 文件会被静默忽略，build 通过但代码不执行。
+
+**Step 3** — 新建域目录和两个文件：
 ```
 main/my_page/
   my_page_view.h
   my_page_view.c
 ```
-
-CMakeLists.txt **无需修改**（已自动 glob `main/` 下所有 `.c`）。
 
 **Step 3** — `my_page_view.c` 最小模板：
 ```c
@@ -118,7 +125,7 @@ void my_page_view_init(void) {
 void my_page_view_init(void);
 ```
 
-**Step 4** — `main/indicator_view.c` 末尾调用：
+**Step 5** — `main/indicator_view.c` 末尾调用：
 ```c
 #include "my_page/my_page_view.h"
 // ...

@@ -109,11 +109,17 @@ static void _on_close(lv_event_t *e) {
 }
 
 void ${SNAKE}_view_show(void) {
-    if (s_overlay) lv_obj_remove_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
+    if (!s_overlay) return;
+    lv_port_sem_take();
+    lv_obj_remove_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
+    lv_port_sem_give();
 }
 
 void ${SNAKE}_view_hide(void) {
-    if (s_overlay) lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
+    if (!s_overlay) return;
+    lv_port_sem_take();
+    lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
+    lv_port_sem_give();
 }
 
 void ${SNAKE}_view_init(void) {
@@ -176,11 +182,15 @@ if [[ "$TYPE" == "tile" ]]; then
 
     echo "━━━ Manual steps required ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
-    echo "1. main/nav/nav.h — add BEFORE the COUNT line:"
+    echo "1. main/CMakeLists.txt — add \"${SNAKE}\" to DIRECTORIES_TO_INCLUDE:"
+    echo "   set(DIRECTORIES_TO_INCLUDE \"util\" \"ha\" ... \"${SNAKE}\")"
+    echo "   ⚠️  Without this, the .c files are silently excluded from the build."
+    echo ""
+    echo "2. main/nav/nav.h — add BEFORE the COUNT line:"
     echo "   #define NAV_TILE_${UPPER}  ${NEW_IDX}"
     echo "   #define NAV_TILE_COUNT    ${NEXT}"
     echo ""
-    echo "2. main/indicator_view.c — add:"
+    echo "3. main/indicator_view.c — add:"
     echo "   #include \"${SNAKE}/${SNAKE}_view.h\""
     echo "   ${SNAKE}_view_init();"
     echo ""
@@ -188,11 +198,15 @@ if [[ "$TYPE" == "tile" ]]; then
 else
     echo "━━━ Manual steps required ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
-    echo "1. main/indicator_view.c — add:"
+    echo "1. main/CMakeLists.txt — add \"${SNAKE}\" to DIRECTORIES_TO_INCLUDE:"
+    echo "   set(DIRECTORIES_TO_INCLUDE \"util\" \"ha\" ... \"${SNAKE}\")"
+    echo "   ⚠️  Without this, the .c files are silently excluded from the build."
+    echo ""
+    echo "2. main/indicator_view.c — add:"
     echo "   #include \"${SNAKE}/${SNAKE}_view.h\""
     echo "   ${SNAKE}_view_init();"
     echo ""
-    echo "2. To show the modal from another domain, post an event or call:"
+    echo "3. To show the modal from another domain, post an event or call:"
     echo "   ${SNAKE}_view_show();"
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
