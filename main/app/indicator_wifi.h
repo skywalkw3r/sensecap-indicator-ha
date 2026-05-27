@@ -1,18 +1,8 @@
 #ifndef INDICATOR_WIFI_H
 #define INDICATOR_WIFI_H
 
-#include "view_data.h"
-#include <esp_wifi.h>
+/* Compatibility shim — WiFi domain has moved to main/wifi/.
+ * Callers that include this header continue to work unchanged. */
+#include "wifi.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-int indicator_wifi_model_init(void);
-int indicator_wifi_view_init(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+#endif /* INDICATOR_WIFI_H */
