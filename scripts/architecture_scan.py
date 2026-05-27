@@ -33,12 +33,11 @@ class Finding:
 
 # Keep this small. Each entry is current debt that Stage 1 documents but does
 # not fix. New code should not be added here without a written reason.
-ALLOWLIST: set[tuple[str, str]] = {
-    ("main/app/indicator_ha_model.c", "model-ui-include"),
-}
+ALLOWLIST: set[tuple[str, str]] = set()
 
 
 ALLOWLIST_SUMMARY_ENTRIES: set[tuple[str, str]] = {
+    ("main/app/indicator_ha_model.c", "model-ui-include"),
     ("main/view_data.h", "shared-bsp-include"),
 }
 
@@ -51,6 +50,13 @@ SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
 
 
 OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, int, str], str] = {
+    (
+        "main/app/indicator_ha_model.c",
+        "model-ui-include",
+        "ui.h",
+        11,
+        '#include "ui.h"',
+    ): "existing Home Assistant model directly includes generated SquareLine UI",
     (
         "main/app/indicator_btn.c",
         "service-register-callback",
@@ -215,11 +221,16 @@ def scan_model_ui_includes(path: Path, text: str, findings: list[Finding]) -> No
     if not is_model_file(path):
         return
     for match in MODEL_UI_INCLUDE_RE.finditer(text):
-        add_finding(
+        line = line_number(text, match.start())
+        line_text = text.splitlines()[line - 1]
+        include_name = match.group(0).split("include", maxsplit=1)[1].strip().strip("<>\"")
+        add_occurrence_finding(
             findings,
             path,
-            line_number(text, match.start()),
+            line,
             "model-ui-include",
+            include_name,
+            line_text,
             "model/controller files should not gain direct SquareLine UI ownership",
         )
 
