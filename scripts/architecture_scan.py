@@ -42,15 +42,25 @@ ALLOWLIST: set[tuple[str, str]] = {
 }
 
 
-EVENT_COMMENT_ALLOWLIST: set[str] = {
-    "VIEW_EVENT_SENSOR_TEMP_HISTORY",
-    "VIEW_EVENT_SENSOR_HUMIDITY_HISTORY",
-    "VIEW_EVENT_SENSOR_TVOC_HISTORY",
-    "VIEW_EVENT_SENSOR_CO2_HISTORY",
-    "VIEW_EVENT_WIFI_CFG_DELETE",
-    # Existing Home Assistant address-display event lacks a payload comment.
-    # Stage 1 should block new undocumented events without editing runtime C.
-    "VIEW_EVENT_HA_ADDR_DISPLAY",
+EVENT_COMMENT_ALLOWLIST_REASONS: dict[str, str] = {
+    "VIEW_EVENT_SENSOR_TEMP_HISTORY": (
+        "existing sensor history event has implicit payload handling in current views"
+    ),
+    "VIEW_EVENT_SENSOR_HUMIDITY_HISTORY": (
+        "existing sensor history event has implicit payload handling in current views"
+    ),
+    "VIEW_EVENT_SENSOR_TVOC_HISTORY": (
+        "existing sensor history event has implicit payload handling in current views"
+    ),
+    "VIEW_EVENT_SENSOR_CO2_HISTORY": (
+        "existing sensor history event has implicit payload handling in current views"
+    ),
+    "VIEW_EVENT_WIFI_CFG_DELETE": (
+        "existing Wi-Fi config delete event has no documented payload in current code"
+    ),
+    "VIEW_EVENT_HA_ADDR_DISPLAY": (
+        "existing Home Assistant address-display event lacks a payload comment"
+    ),
 }
 
 
@@ -165,7 +175,7 @@ def scan_event_payload_comments(path: Path, text: str, findings: list[Finding]) 
         name, comment = match.groups()
         if name == "VIEW_EVENT_ALL":
             continue
-        if name in EVENT_COMMENT_ALLOWLIST:
+        if name in EVENT_COMMENT_ALLOWLIST_REASONS:
             continue
         if not comment or not comment.strip():
             add_finding(
@@ -208,6 +218,8 @@ def main() -> int:
     if args.list_allowlist:
         for path, rule in sorted(ALLOWLIST):
             print(f"{path}: {rule}")
+        for event, reason in sorted(EVENT_COMMENT_ALLOWLIST_REASONS.items()):
+            print(f"{event}: event-payload-comment: {reason}")
         return 0
 
     findings = scan()
