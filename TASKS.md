@@ -21,12 +21,7 @@
 
 ---
 
-## 进行中
-
-- [ ] **清理 main/app/ 过渡 shim .h 文件**
-  - 将所有 `#include "indicator_xxx.h"` 调用方改为直接 include 新域头文件
-  - 删除 app/ 下所有 shim .h 文件
-  - 若 app/ 仅剩 AGENTS.md，从 CMakeLists DIRECTORIES_TO_INCLUDE 移除 "app"
+- [x] main/app/ shim .h 全部删除，调用方直接 include 域头文件（2026-05-27）
 
 ---
 
