@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def run(label: str, cmd: list[str]) -> None:
-    print(f"\n==> {label}")
-    print("$ " + " ".join(cmd))
+    print(f"\n==> {label}", flush=True)
+    print("$ " + " ".join(cmd), flush=True)
     subprocess.run(cmd, cwd=ROOT, check=True)
 
 
