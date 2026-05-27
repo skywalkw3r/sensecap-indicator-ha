@@ -1,21 +1,32 @@
-# Home Assistant & SenseCAP Indicator
+# SenseCAP Indicator Home Assistant
 
 <p align="left">
-  <a href="https://docs.espressif.com/projects/esp-idf/en/release-v5.1/esp32/">
-    <img src="https://img.shields.io/badge/esp--idf-v5.1-00b202" alt="idf-version">
+  <a href="https://docs.espressif.com/projects/esp-idf/en/release-v5.4/esp32s3/">
+    <img src="https://img.shields.io/badge/esp--idf-v5.4.x-00b202" alt="idf-version">
   </a>
+  <img src="https://img.shields.io/badge/version-v1.1.0-blue" alt="version">
 </p>
 
-The Home Assistant demo is available in two versions:
+This firmware turns the SenseCAP Indicator into a Home Assistant companion panel. It connects to Wi-Fi, publishes the built-in environmental sensors through MQTT, and exposes on-screen controls that can be driven from Home Assistant.
 
-- Has only Home Assistant features, which is this repo.
-- Which includes the indicator_basis example  -> [branch - feat_home_assistant](https://github.com/Seeed-Solution/SenseCAP_Indicator_ESP32/tree/main/examples/indicator_ha)
+## Version
 
-There are three demos that show how the indicator integrates with Home Assistant in three ways:
+- Current firmware: `v1.1.0`
+- Baseline release: `v1.0.0`
+- ESP-IDF: `v5.4.x`
+
+`v1.1.0` upgrades the project from the older ESP-IDF 5.1-era codebase to ESP-IDF 5.4.x and improves the MQTT setup experience. The serial console now includes an `mqtthelp` command with concrete broker, topic, and payload examples.
+
+## Features
 
 - [x] [MQTT](#mqtt)
-- [ ] RESTful API(HTTP)
-- [ ] Websocket 
+- [x] Wi-Fi setup from the device screen
+- [x] MQTT broker configuration from the device screen
+- [x] MQTT broker/client configuration from the serial console
+- [x] Built-in sensor publishing: temperature, humidity, CO2, tVOC
+- [x] Home Assistant control widgets: switches, arc control, slider control
+- [ ] REST API
+- [ ] WebSocket
 
 <figure class="third">
     <img align="left" src="./assets/Home Assistant Data.png" width="240"/>
@@ -27,29 +38,49 @@ There are three demos that show how the indicator integrates with Home Assistant
 
 ## MQTT
 
-The wiki for `MQTT` method is provided: [SenseCAP Indicator - Home Assistant Application Development](https://wiki.seeedstudio.com/SenseCAP_Indicator_Application_Home_Assistant/)
+The MQTT integration uses three fixed topics:
 
-### Features
+| Direction | Topic | Example payload |
+| --- | --- | --- |
+| Device sensor data | `indicator/sensor` | `{"temp":"23.5"}` |
+| Home Assistant control command | `indicator/switch/set` | `{"switch1":1}` |
+| Device control state | `indicator/switch/state` | `{"switch1":1}` |
 
-- [x] Wi-Fi Panel - Connect Wi-Fi via screen
-- [x] Display config - Control the intensity of the screen
-- [x] Home Assistant data - Display Sensor data
-- [x] Home Assistant control - the control widgets
+Supported sensor keys are `temp`, `humidity`, `co2`, and `tvoc`. Supported control keys are `switch1` through `switch8`.
 
-### How to use example
+### Configure MQTT
 
-Please first read the [User Guide](https://wiki.seeedstudio.com/Sensor/SenseCAP/SenseCAP_Indicator/Get_started_with_SenseCAP_Indicator/) of the SenseCAP Indicator Board to learn about its software and hardware information.
+You can configure the MQTT broker in either place:
 
-Here are some simple steps to use.
+- On the device screen: open Settings, choose the MQTT broker page, enter the broker IP address, and confirm. The firmware stores it as `mqtt://<ip>:1883`.
+- From the serial console: use `setmqtt` for full broker/client configuration.
+
+Useful serial commands:
+
+```text
+haconfig
+mqtthelp
+setmqtt -a 192.168.1.10 -c indicator-01 -u mqtt_user -p mqtt_password
+setmqtt --addr mqtt://192.168.1.10:1883
+setmqtt --addr mqtt://broker.emqx.io
+```
+
+After `setmqtt` succeeds, the firmware saves the configuration to NVS and restarts the MQTT client automatically.
+
+The MQTT method is also covered in the Seeed wiki: [SenseCAP Indicator - Home Assistant Application Development](https://wiki.seeedstudio.com/SenseCAP_Indicator_Application_Home_Assistant/).
+
+### Home Assistant Setup
 
 - Step 1: [Install Home Assistant](https://www.home-assistant.io/installation/)
-- Step 2: Install MQTT Broker
-- Step 3: Add MQTT  integration and config
-- Step 4: Modify "configuration.yaml" to add Indicator entity
-- Step 5: Edit Dashboard
+- Step 2: Install or enable an MQTT broker, such as Mosquitto.
+- Step 3: Add the MQTT integration in Home Assistant.
+- Step 4: Configure the Indicator to use the same broker address and credentials.
+- Step 5: Add the entities below to `configuration.yaml`.
+- Step 6: Restart Home Assistant and add the dashboard cards.
 
-Add the following to your "configuration.yaml" file
-```
+Add the following to your `configuration.yaml` file:
+
+```yaml
 # Example configuration.yaml entry
 mqtt:
   sensor:
@@ -145,9 +176,9 @@ mqtt:
 ```
 
 
-Add the following to the raw configuration editor of the dashboard.
+Add the following to the raw configuration editor of the dashboard:
 
-```
+```yaml
 views:
   - title: Indicator device
     icon: ''
@@ -193,9 +224,28 @@ views:
 
 
 
-# Build and Flash
+## Build and Flash
 
-- Run `idf.py -p PORT flash monitor` to build, flash and monitor the project.
+This branch is built with ESP-IDF `v5.4.x`. The local helper script defaults to `/Users/spencer/esp/v5.4.3/esp-idf` when `IDF_PATH` is not already set.
+
+Build:
+
+```bash
+sh build.sh
+```
+
+Flash:
+
+```bash
+. "$HOME/esp/v5.4.3/esp-idf/export.sh"
+idf.py -p PORT -b 460800 flash
+```
+
+Monitor:
+
+```bash
+idf.py -p PORT monitor
+```
 
 (To exit the serial monitor, type ``Ctrl-]``.)
 
@@ -217,7 +267,7 @@ General note: Please avoid folder-names and filenames containing non-ASCII (spec
   [ESP-IDF Get started](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html)
   - Install ESP-IDF on Windows: [Description page](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/windows-setup.html)
   - There's a ESP-related IDE too, made by Espressif, containing ESP-IDF, called Espressif-IDE which is based on Eclipse CDT. [Espressif-IDE](https://github.com/espressif/idf-eclipse-plugin/blob/master/docs/Espressif-IDE.md)
-    - Get the [ESP-IDF offline Windows installer](https://dl.espressif.com/dl/idf-installer/esp-idf-tools-setup-offline-5.1.2.exe?) or [Espressif-IDE Windows installer](https://dl.espressif.com/dl/idf-installer/espressif-ide-setup-2.11.1-with-esp-idf-5.1.2.exe?)
+    - Get an ESP-IDF 5.4.x offline installer or an Espressif-IDE installer that bundles ESP-IDF 5.4.x.
     - Install it on your Windows system accepting all offered options and default settings. This automagically installs Python, git, CMake, etc all at once under C:\Espressif folder.
     - You can start building in command-line from the PowerShell/CMD entries created in the start-menu, but with the help of the included build.bat you can build on a normal commandline too
     - Or you can build the project in the IDE GUI, see 'Usage' section.

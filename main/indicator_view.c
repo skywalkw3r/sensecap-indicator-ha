@@ -1,5 +1,6 @@
 #include "indicator_enabler.h"
 
+#include "lv_port.h"
 #include "ui.h"
 #include "view_data.h"
 

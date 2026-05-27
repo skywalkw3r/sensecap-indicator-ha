@@ -2,6 +2,7 @@
 #include "bsp_btn.h"
 #include "esp_timer.h"
 #include <nvs.h>
+#include <nvs_flash.h>
 
 static uint32_t hold_cnt = 0;
 static bool sleep_flag = false;

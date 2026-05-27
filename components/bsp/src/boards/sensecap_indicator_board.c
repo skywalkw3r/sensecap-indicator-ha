@@ -43,12 +43,20 @@ static const board_button_t g_btns[] = {
     {BOARD_BTN_ID_USER, 0,      GPIO_NUM_38,    0},
 };
 
+static esp_err_t tca9535_read_input_pins_8(uint8_t *pin_val)
+{
+    uint16_t pins = 0;
+    esp_err_t ret = tca9535_read_input_pins(&pins);
+    *pin_val = (uint8_t)pins;
+    return ret;
+}
+
 static const io_expander_ops_t g_board_lcd_evb_io_expander_ops = {
     .init = tca9535_init,
     .set_direction = tca9535_set_direction,
     .set_level = tca9535_set_level,
     .read_output_pins = NULL,
-    .read_input_pins = tca9535_read_input_pins,
+    .read_input_pins = tca9535_read_input_pins_8,
     .multi_write_start = tca9535_multi_write_start,
     .multi_write_new_level = tca9535_multi_write_new_level,
     .multi_write_end = tca9535_multi_write_end,
@@ -304,4 +312,3 @@ const board_res_desc_t *bsp_board_sensecap_indicator_get_res_desc(void)
 {
     return &g_board_lcd_evb_res;
 }
-

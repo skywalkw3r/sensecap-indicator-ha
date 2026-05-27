@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 int indicator_wifi_model_init(void);
-// int indicator_wifi_view_init(void);
+int indicator_wifi_view_init(void);
 
 #ifdef __cplusplus
 }

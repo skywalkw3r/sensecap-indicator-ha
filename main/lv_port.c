@@ -35,7 +35,7 @@ static TaskHandle_t lvgl_task_handle;
 
 static void lv_port_disp_init(void);
 static void lv_port_indev_init(void);
-static bool lv_port_flush_ready(void);
+static bool lv_port_flush_ready(void *data);
 static bool lv_port_flush_is_last(void);
 static IRAM_ATTR void touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data);
 static void disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p);
@@ -76,8 +76,10 @@ void lv_port_sem_give(void)
  * @return true Call `portYIELD_FROM_ISR()` after esp-lcd ISR return.
  * @return false Do nothing after esp-lcd ISR return.v
  */
-static bool lv_port_flush_ready(void)
+static bool lv_port_flush_ready(void *data)
 {
+    (void)data;
+
     /* Inform the graphics library that you are ready with the flushing */
     lv_disp_flush_ready(&disp_drv);
 

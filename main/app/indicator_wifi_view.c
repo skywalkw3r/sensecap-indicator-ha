@@ -1,4 +1,5 @@
 #include "indicator_wifi.h"
+#include "indicator_util.h"
 #include "lv_port.h"
 #include "ui.h"
 
@@ -486,7 +487,7 @@ static void __view_event_handler(void* handler_args, esp_event_base_t base, int3
 			ESP_LOGI(TAG, "event: VIEW_EVENT_WIFI_ST | update wifi signal icon");
 			struct view_data_wifi_st* p_st = (struct view_data_wifi_st*)event_data;
 
-			uint8_t* p_src = NULL;
+			const void* p_src = NULL;
 			// todo is_network
 			if(p_st->is_connected)
 			{
@@ -550,7 +551,7 @@ static void __view_event_handler(void* handler_args, esp_event_base_t base, int3
 
 			if(p_list->is_connect)
 			{
-				create_wifi_item(ui_wifi_list, p_list->connect.ssid, p_list->connect.auth_mode, p_list->connect.ssid,
+				create_wifi_item(ui_wifi_list, p_list->connect.ssid, p_list->connect.auth_mode, p_list->connect.rssi,
 								 true);
 			}
 			for(int i = 0; i < p_list->cnt; i++)
