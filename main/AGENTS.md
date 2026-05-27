@@ -1,71 +1,230 @@
-# ESP32S3 SCREEN-SIDE GUIDE
+# AGENTS.md — SenseCAP Indicator HA
 
-Scope: `main/` and child modules for the ESP32S3 side of the Home Assistant firmware.
+Agent 开发指南。在修改代码之前请先读完本文件。
 
-## Current Runtime Shape
+---
 
-`main/main.c` initializes hardware, LVGL, and a dedicated `view_event_handle`.
+## 项目概述
 
-`main/indicator_view.c` creates the SquareLine UI with `ui_init()` and registers view-side modules.
+ESP32-S3 + RP2040 固件，LVGL 9.5.0（ESP Component Manager 管理），ESP-IDF 5.4.3，FreeRTOS。
+显示屏：480×800 RGB565，触摸输入。Home Assistant 通过 MQTT 集成。
 
-`main/indicator_model.c` initializes model/service modules:
+---
 
-- NVS storage
-- button handling
-- display/backlight settings
-- RP2040 UART ingress
-- built-in sensor model
-- console commands
-- Wi-Fi model
-- MQTT controller
-- Home Assistant model
+## 文件布局
 
-## Rules
+```
+main/
+  ha/           HA 域：MQTT 订阅/发布、switch/sensor/arc 控件
+  wifi/         WiFi 域：扫描、连接、状态显示
+  sensor/       Sensor 域：SHT41/SGP40/SCD41 数据展示
+  display/      Display 域：亮度、睡眠模式
+  rp2040/       RP2040 UART/COBS 通信
+  btn/          按钮 GPIO
+  mqtt/         MQTT 总线（共享实例）
+  storage/      NVS 读写
+  cmd/          UART 控制台命令
+  nav/          lv_tileview 导航（主屏滑动）
+  assets/       图像和字体资源（LVGL 9 格式）
+  util/         公共工具函数
+  app/          ⚠️ 仅含 AGENTS.md，不在此新建文件
 
-- Do not replace `bsp_board_init()` or `lv_port_init()` with starter project code.
-- Treat `main/ui/` as SquareLine-generated UI.
-- View modules may include `ui.h` and mutate LVGL objects.
-- Model modules should own state, persistence, protocol parsing, MQTT, Wi-Fi, and hardware-facing logic.
-- Do not add new UI object ownership to model modules.
-- Keep `view_event_handle` as the current event loop until a scoped Stage 2 event migration exists.
-- Keep event payloads fixed-size unless the lifetime rule is documented next to the event id.
-- Prefer adding small helpers over broad rewrites.
+  main.c              入口
+  indicator_model.c   全局模型初始化（各域 model_init 汇总）
+  indicator_view.c    全局视图初始化（各域 view_init 汇总）
+  indicator_enabler.h 功能开关（#include 各域头文件）
+  lv_port.c           ⚠️ BSP 硬件边界，见禁区说明
+  view_data.h         事件 ID + 事件数据结构体
+  home_assistant_config.h  HA MQTT topic 配置
+  idf_component.yml   ESP Component Manager 依赖声明
+```
 
-## LVGL Threading
+每个域的结构：
+```
+main/<domain>/
+  <domain>.h          公共接口（model init 等）
+  <domain>.c          业务逻辑
+  <domain>_view.h     视图接口
+  <domain>_view.c     LVGL 控件创建 + 事件处理
+```
 
-Current code uses `lv_port_sem_take()` and `lv_port_sem_give()` around LVGL calls. Follow the local pattern for Stage 1.
+---
 
-Future Stage 2 work may add an `app_ui_post()` helper. Do not invent another UI deferral API in Stage 1.
+## 导航系统
 
-## Generated UI
+主屏使用 `lv_tileview`，横向滑动，当前 3 个 tile：
 
-SquareLine files live in:
+```c
+// main/nav/nav.h
+#define NAV_TILE_HA_DATA  0   // 传感器数据页
+#define NAV_TILE_HA_CTRL  1   // HA 开关控制页
+#define NAV_TILE_HA_MIX   2   // HA 混合控件页（弧形/滑块）
+#define NAV_TILE_COUNT    3
+```
 
-- `main/ui/ui.h`
-- `main/ui/ui.c`
-- `main/ui/ui_events.c`
-- `main/ui/screens/`
-- `main/ui/images/`
-- `main/ui/fonts/`
+弹窗/设置使用 `lv_layer_top()` 作为父容器（悬浮在 tileview 之上）。
 
-Do not hand-edit generated files for architecture-only tasks.
+---
 
-## Verification
+## 新建页面 — 四步套路
 
-Run:
+### 类型 A：全屏 Tile（可左右滑动的主页面）
+
+**Step 1** — `main/nav/nav.h` 增加常量（两处都要改）：
+```c
+#define NAV_TILE_MY_PAGE  3
+#define NAV_TILE_COUNT    4   // ← 必须同步 +1，否则 tile 显示空白
+```
+
+**Step 2** — 新建域目录和两个文件：
+```
+main/my_page/
+  my_page_view.h
+  my_page_view.c
+```
+
+CMakeLists.txt **无需修改**（已自动 glob `main/` 下所有 `.c`）。
+
+**Step 3** — `my_page_view.c` 最小模板：
+```c
+#include <string.h>
+#include "lvgl.h"
+#include "nav.h"
+#include "lv_port.h"
+#include "view_data.h"
+#include "esp_log.h"
+
+static const char *TAG = "my_page_view";
+
+void my_page_view_init(void) {
+    lv_port_sem_take();
+    lv_obj_t *tile = nav_get_tile(NAV_TILE_MY_PAGE);
+    if (!tile) { lv_port_sem_give(); return; }
+
+    lv_obj_t *label = lv_label_create(tile);
+    lv_label_set_text(label, "My Page");
+    lv_obj_center(label);
+    lv_port_sem_give();
+
+    // 注册事件监听（如需响应域间事件）
+    // esp_event_handler_instance_register_with(
+    //     view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_XXX, cb, NULL, NULL);
+}
+```
+
+`my_page_view.h` 只需：
+```c
+#pragma once
+void my_page_view_init(void);
+```
+
+**Step 4** — `main/indicator_view.c` 末尾调用：
+```c
+#include "my_page/my_page_view.h"
+// ...
+my_page_view_init();
+```
+
+### 类型 B：Modal 弹窗（设置/对话框）
+
+不占 tile，浮在最上层：
+```c
+lv_obj_t *overlay = lv_obj_create(lv_layer_top());
+lv_obj_set_size(overlay, 480, 800);
+lv_obj_set_style_bg_color(overlay, lv_color_hex(0x1A1A1A), 0);
+lv_obj_set_style_bg_opa(overlay, LV_OPA_COVER, 0);
+lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);   // 初始隐藏
+
+// 显示：lv_obj_remove_flag(overlay, LV_OBJ_FLAG_HIDDEN);
+// 隐藏：lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
+```
+
+参考实现：`main/wifi/wifi_view.c`、`main/display/display_view.c`、`main/ha/ha_config.c`。
+
+---
+
+## 域间通信规则
+
+**唯一合法的跨域通信方式**：`view_event_handle`（`VIEW_EVENT_BASE`）。
+
+```c
+// 发送事件
+struct view_data_sensor_data data = { .sensor_type = SHT41_SENSOR_TEMP, .value = 25.3f };
+esp_event_post_to(view_event_handle, VIEW_EVENT_BASE,
+                  VIEW_EVENT_SENSOR_DATA, &data, sizeof(data), 0);
+
+// 接收事件（在 view_init 中注册）
+esp_event_handler_instance_register_with(
+    view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SENSOR_DATA,
+    my_handler, NULL, NULL);
+```
+
+所有事件 ID 和数据结构在 `main/view_data.h` 定义。
+
+---
+
+## LVGL 使用规则
+
+| 规则 | 说明 |
+|------|------|
+| 访问 LVGL 必须持锁 | `lv_port_sem_take()` / `lv_port_sem_give()` |
+| 字体声明 | `LV_FONT_DECLARE(ui_font_font0)` |
+| 图像声明 | `LV_IMAGE_DECLARE(ui_img_ic_temp_png)` |
+| 发送 LVGL 事件 | `lv_obj_send_event(obj, LV_EVENT_CLICKED, NULL)` |
+| include 路径 | `#include "lvgl.h"`（不是 `lvgl/lvgl.h`） |
+
+### assets/ 图像格式（LVGL 9）
+
+数据为 RGB565 + Alpha 交错，3 字节/像素。新增图像描述符格式：
+```c
+const lv_image_dsc_t ui_img_xxx = {
+    .header.magic  = LV_IMAGE_HEADER_MAGIC,
+    .header.cf     = LV_COLOR_FORMAT_NATIVE_WITH_ALPHA,
+    .header.flags  = 0,
+    .header.w      = W,
+    .header.h      = H,
+    .header.stride = W * 3,        // 3 bytes/pixel（RGB565 + A 交错）
+    .data_size     = sizeof(ui_img_xxx_data),
+    .data          = ui_img_xxx_data,
+};
+```
+
+---
+
+## ⚠️ 禁区
+
+| 文件/目录 | 原因 |
+|-----------|------|
+| `main/lv_port.c` | BSP 硬件边界，改动影响整个显示系统，非显示硬件任务不动 |
+| `components/bsp/` | 硬件驱动层 |
+| `managed_components/` | 由 ESP Component Manager 自动管理，不手动编辑 |
+| `main/app/` | 历史遗留目录，不在此新建文件 |
+
+---
+
+## 验证清单（每次改动后按顺序执行）
 
 ```bash
+# 1. 架构扫描（检查 ui.h 泄漏、域边界违规）
 python3 scripts/architecture_scan.py
+
+# 2. 构建（必须 0 error）
+source ~/esp/v5.4.3/esp-idf/export.sh
+idf.py build
+
+# 3. HA/MQTT 协议改动时额外运行
+python3 scripts/test_ha_switch_protocol.py
 ```
 
-Then run the build wrapper when ESP-IDF is available:
+---
 
-```bash
-python3 scripts/dev_check.py
-```
+## 常见编译错误速查
 
-The direct firmware build path remains:
-
-```bash
-sh build.sh
-```
+| 错误信息 | 原因 | 修复 |
+|----------|------|------|
+| `lvgl/lvgl.h: No such file` | 旧 LVGL 8 路径 | 改为 `#include "lvgl.h"` |
+| `lv_event_send` 类型不匹配 | LVGL 8 API | 改为 `lv_obj_send_event(obj, event, NULL)` |
+| `always_zero` 无此成员 | 旧图像描述符格式 | 用上方 assets 格式重写 |
+| `LV_IMG_CF_TRUE_COLOR_ALPHA` 未声明 | LVGL 8 常量 | 改为 `LV_COLOR_FORMAT_NATIVE_WITH_ALPHA` |
+| tile 页面空白 | `NAV_TILE_COUNT` 未更新 | nav.h 中 COUNT 同步 +1 |
+| LVGL assert / crash | 未持锁访问 LVGL | 加 `lv_port_sem_take/give` |
