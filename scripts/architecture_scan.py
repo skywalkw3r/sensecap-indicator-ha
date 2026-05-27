@@ -133,13 +133,10 @@ VIEW_FILE_PATTERNS = (
 
 
 MODEL_FILE_PATTERNS = (
-    re.compile(r"(^|/)indicator_model\.c$"),
-    re.compile(r"(^|/)indicator_.*_model\.c$"),
-    re.compile(r"(^|/)indicator_mqtt\.c$"),
-    re.compile(r"(^|/)esp32_rp2040\.c$"),
-    re.compile(r"(^|/)indicator_cmd\.c$"),
-    re.compile(r"(^|/)indicator_storage_nvs\.c$"),
-    re.compile(r"(^|/)indicator_btn\.c$"),
+    re.compile(r"(^|/)indicator_model\.[ch]$"),
+    re.compile(r"(^|/)indicator_.*_model\.[ch]$"),
+    re.compile(r"(^|/)indicator_(?!view\.)(?!.*_view)[a-zA-Z0-9_]*\.[ch]$"),
+    re.compile(r"(^|/)esp32_rp2040\.[ch]$"),
 )
 
 

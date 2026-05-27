@@ -52,19 +52,19 @@ Do not hand-edit generated files for architecture-only tasks.
 
 ## Verification
 
-Later Stage 1 checks will include:
+Run:
 
 ```bash
 python3 scripts/architecture_scan.py
 ```
 
-and:
+Then run the build wrapper when ESP-IDF is available:
 
 ```bash
 python3 scripts/dev_check.py
 ```
 
-Until those scripts exist, run the current build wrapper when ESP-IDF is available:
+The direct firmware build path remains:
 
 ```bash
 sh build.sh

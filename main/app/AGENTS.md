@@ -39,6 +39,6 @@ Scope: `main/app/`.
 
 1. Identify whether the change belongs to a model file or a view file.
 2. Keep runtime behavior compatible.
-3. Run `python3 scripts/architecture_scan.py` after that later Stage 1 check exists.
-4. Run `python3 scripts/dev_check.py` after that later Stage 1 check exists, or `sh build.sh` if ESP-IDF is available.
+3. Run `python3 scripts/architecture_scan.py`.
+4. Run `python3 scripts/dev_check.py` if ESP-IDF is available, or `python3 scripts/dev_check.py --skip-build` for architecture-only checks.
 5. Document manual hardware checks when behavior changes.

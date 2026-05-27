@@ -49,7 +49,7 @@ View initialization starts SquareLine UI and view handlers. Model initialization
 | Display settings | `main/app/indicator_display_model.c`, `main/app/indicator_display_view.c` |
 | RP2040 UART ingress | `main/app/esp32_rp2040.c` |
 | Built-in sensor cache/parser | `main/app/indicator_sensor_model.c`, `main/app/indicator_sensor_view.c` |
-| Future local development checks | Later Stage 1: `scripts/dev_check.py` |
+| Local development checks | `scripts/dev_check.py`, `scripts/architecture_scan.py` |
 
 ## Architecture Rules
 
@@ -64,20 +64,20 @@ View initialization starts SquareLine UI and view handlers. Model initialization
 
 ## Verification
 
-Stage 1 target local checks, added by later Stage 1 tasks:
+Preferred local checks:
 
 ```bash
 python3 scripts/dev_check.py --skip-build
 python3 scripts/dev_check.py
 ```
 
-The architecture-only fallback is also added later in Stage 1:
+Architecture-only check:
 
 ```bash
 python3 scripts/architecture_scan.py
 ```
 
-Until those scripts exist, the valid current check is the firmware build when ESP-IDF is available:
+The firmware build path is:
 
 ```bash
 sh build.sh
