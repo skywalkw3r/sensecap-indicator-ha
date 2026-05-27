@@ -19,7 +19,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lv_port.h"
-#include "ui/ui.h"
 
 #define VERSION		 "v1.1.0"
 #define LOG_MEM_INFO 1
@@ -63,7 +62,7 @@ void app_main(void) {
 	ESP_ERROR_CHECK(
 		esp_event_loop_create(&view_event_task_args, &view_event_handle));
 
-	indicator_view_init(); /* ui_init() */
+	indicator_view_init();
 
 	indicator_model_init();
 
