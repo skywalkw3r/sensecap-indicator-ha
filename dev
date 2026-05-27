@@ -19,4 +19,4 @@ case "$1" in
     ;;
 esac
 
-exec "$(dirname "$0")/scripts/dev.py" "$@"
+exec python3 "$(dirname "$0")/scripts/dev.py" "$@"
