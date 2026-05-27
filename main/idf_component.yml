@@ -1,8 +1,0 @@
-dependencies:
-  # LVGL is published on the ESP Component Registry as lvgl/lvgl.
-  lvgl/lvgl:
-    version: "9.4.0"
-    public: true
-  espressif/esp_lvgl_port:
-    version: "2.7.0"
-    public: true
