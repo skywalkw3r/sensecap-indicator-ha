@@ -1,8 +1,10 @@
 #include "indicator_display.h"
+#include "indicator_storage_nvs.h"
 
 #include "freertos/semphr.h"
 
 #include <nvs.h>
+#include <string.h>
 #include "driver/ledc.h"
 #include "esp_timer.h"
 

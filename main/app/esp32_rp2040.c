@@ -15,6 +15,7 @@
 // #include "time.h"
 #include "view_data.h"
 #include <stdlib.h>
+#include <string.h>
 
 static const char* TAG = "esp32_rp2040";
 

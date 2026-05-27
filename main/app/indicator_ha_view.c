@@ -1,6 +1,7 @@
 #include "core/lv_obj.h"
 #include "extra/widgets/msgbox/lv_msgbox.h"
 #include "indicator_ha.h"
+#include "lv_port.h"
 #include "misc/lv_anim.h"
 #include "view_data.h"
 #include "ui.h"
@@ -195,5 +196,4 @@ int indicator_ha_view_init(void) {
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
 		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_ADDR_DISPLAY, __view_event_handler, NULL, NULL));
 }
-
 

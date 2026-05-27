@@ -21,7 +21,7 @@
 #include "lv_port.h"
 #include "ui/ui.h"
 
-#define VERSION		 "v1.0.0"
+#define VERSION		 "v1.1.0"
 #define LOG_MEM_INFO 1
 #define SENSECAP \
 	"\n\

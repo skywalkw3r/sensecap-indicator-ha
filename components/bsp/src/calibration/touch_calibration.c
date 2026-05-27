@@ -50,9 +50,9 @@ static bool g_calibrated = false;
 static int (*g_touch_is_pressed)(void) = NULL;
 static esp_err_t (*g_touch_read_rawdata)(uint16_t *x, uint16_t *y) = NULL;
 
-static void lcd_draw_bitmap(int x, int y, int w, int h, void *data)
+static esp_err_t lcd_draw_bitmap(int x, int y, int w, int h, const void *data)
 {
-    bsp_lcd_flush(x, y, x + w, y + h, data);
+    return bsp_lcd_flush(x, y, x + w, y + h, data);
 }
 
 static esp_err_t touch_save_calibration(const void *buf, size_t sz)

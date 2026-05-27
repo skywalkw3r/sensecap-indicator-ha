@@ -47,7 +47,9 @@ static void expander_io_int(void* arg)
     for(;;) {
         if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
             //printf("GPIO[%"PRIu32"] intr, val: %d\n", io_num, gpio_get_level(io_num));
-            (g_dioIrq) (0); //handle irq
+            if (g_dioIrq) {
+                g_dioIrq(0); //handle irq
+            }
         }
     }
 }
@@ -187,7 +189,7 @@ void bsp_sx126x_init(void)
 
 void SX126xIoIrqInit( DioIrqHandler dioIrq )
 {
-    g_dioIrq = (uint32_t *)dioIrq;
+    g_dioIrq = dioIrq;
 
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_NEGEDGE; //falling edge
@@ -249,7 +251,7 @@ void SX126xReset( void )
 
 void SX126xWaitOnBusy( void )
 {
-    uint16_t pin_val;
+    uint8_t pin_val;
     while(1) {
         esp_err_t ret = p_io_expander->read_input_pins(&pin_val);
         if( ret == ESP_OK ) {
@@ -425,7 +427,7 @@ bool SX126xCheckRfFrequency( uint32_t frequency )
 
 uint32_t SX126xGetDio1PinState( void )
 {
-    uint16_t pin_val;
+    uint8_t pin_val;
     esp_err_t ret = p_io_expander->read_input_pins(&pin_val);
     if( ret == ESP_OK ) {
         if( (pin_val & (0x01 << EXPANDER_IO_RADIO_DIO_1)) ) {
@@ -434,4 +436,3 @@ uint32_t SX126xGetDio1PinState( void )
     }
     return 0;
 }
-

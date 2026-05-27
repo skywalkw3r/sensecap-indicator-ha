@@ -80,5 +80,5 @@ void ui_event_wifi_start(lv_event_t* e) {
 
 void mqtt_addr_changed(lv_event_t* e) {
 	ESP_LOGI(TAG, "addr button comfirmed");
-	esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_MQTT_ADDR_CHANGED, NULL, NULL, portMAX_DELAY);
+	esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_MQTT_ADDR_CHANGED, NULL, 0, portMAX_DELAY);
 }

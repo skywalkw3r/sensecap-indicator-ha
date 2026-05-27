@@ -2,6 +2,7 @@
 #include "argtable3/argtable3.h"
 #include "esp_console.h"
 
+#include "home_assistant_config.h"
 #include "indicator_ha.h"
 #include "indicator_storage_nvs.h"
 #include "indicator_util.h"
@@ -20,14 +21,62 @@ esp_event_loop_handle_t cmd_cfg_event_handle;
 
 static ha_cfg_interface ha_cfg;
 
+static void print_mqtt_usage(void)
+{
+    printf("\nMQTT configuration\n");
+    printf("  Show current config:\n");
+    printf("    haconfig\n\n");
+    printf("  Set broker, client id and credentials:\n");
+    printf("    setmqtt -a 192.168.1.10 -c indicator-01 -u mqtt_user -p mqtt_password\n");
+    printf("    setmqtt --addr mqtt://192.168.1.10:1883\n");
+    printf("    setmqtt --addr mqtt://broker.emqx.io\n\n");
+    printf("  Notes:\n");
+    printf("    - The screen MQTT page only asks for the broker IP. It builds mqtt://<ip>:1883.\n");
+    printf("    - Restart is automatic after setmqtt succeeds.\n\n");
+    printf("MQTT topics and payloads\n");
+    printf("  Sensor data from device:\n");
+    printf("    topic: %s\n", CONFIG_TOPIC_SENSOR_DATA);
+    printf("    data : {\"temp\":\"23.5\"}, {\"humidity\":\"55\"}, {\"co2\":\"600\"}, {\"tvoc\":\"12\"}\n\n");
+    printf("  Control device from Home Assistant/MQTT client:\n");
+    printf("    topic: %s\n", CONFIG_TOPIC_SWITCH_SET);
+    printf("    data : {\"switch1\":1}, {\"switch1\":0}, {\"switch5\":24}, {\"switch8\":50}\n\n");
+    printf("  Device publishes control state:\n");
+    printf("    topic: %s\n", CONFIG_TOPIC_SWITCH_STATE);
+    printf("    data : {\"switch1\":1}, {\"switch5\":24}, {\"switch8\":50}\n\n");
+}
+
+static bool normalize_broker_url(const char *input, char *output, size_t output_size)
+{
+    if (!input || input[0] == '\0' || !output || output_size == 0) {
+        return false;
+    }
+
+    int written = 0;
+    if (strncmp(input, "mqtt://", 7) == 0 || strncmp(input, "mqtts://", 8) == 0) {
+        written = snprintf(output, output_size, "%s", input);
+    } else {
+        written = snprintf(output, output_size, "mqtt://%s", input);
+    }
+
+    return written > 0 && (size_t)written < output_size;
+}
+
 // Function to read and display the current contents of ha_cfg
 static int read_ha_config(int argc, char **argv)
 {
+    ha_cfg_get(&ha_cfg);
     ESP_LOGI(TAG, "| Broker Address               | %-40s |", ha_cfg.broker_url);
     ESP_LOGI(TAG, "| Client ID                    | %-40s |", ha_cfg.client_id);
     ESP_LOGI(TAG, "| MQTT username                | %-40s |", ha_cfg.username);
     ESP_LOGI(TAG, "| MQTT password                | %-40s |", ha_cfg.password);
+    ESP_LOGI(TAG, "Run 'mqtthelp' for setmqtt examples and MQTT topic/payload examples.");
 
+    return 0;
+}
+
+static int mqtt_help(int argc, char **argv)
+{
+    print_mqtt_usage();
     return 0;
 }
 
@@ -36,9 +85,20 @@ static void register_read_config(void)
 {
     const esp_console_cmd_t cmd = {
         .command = "haconfig",
-        .help    = "Read and display current configuration",
+        .help    = "Show current MQTT broker/client configuration",
         .hint    = NULL,
         .func    = &read_ha_config,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static void register_mqtt_help(void)
+{
+    const esp_console_cmd_t cmd = {
+        .command = "mqtthelp",
+        .help    = "Show MQTT setup examples, topics and payloads",
+        .hint    = NULL,
+        .func    = &mqtt_help,
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
@@ -58,6 +118,7 @@ static int mqtt_config_set(int argc, char **argv)
 
     if (nerrors != 0) {
         arg_print_errors(stderr, mqtt_args.end, argv[0]);
+        print_mqtt_usage();
         return 1;
     }
 
@@ -65,11 +126,11 @@ static int mqtt_config_set(int argc, char **argv)
         !mqtt_args.password->count &&
         !mqtt_args.broker_url->count &&
         !mqtt_args.client_id->count) {
-        // None of the relevant arguments are provided
-        // ESP_LOGI(TAG, "No MQTT configuration arguments provided.");
-        return 0; // Exit without updating configuration
+        print_mqtt_usage();
+        return 0;
     }
 
+    ha_cfg_get(&ha_cfg);
 
     if (mqtt_args.username->count > 0) {
         memset(ha_cfg.username, 0, sizeof(ha_cfg.username));
@@ -84,34 +145,14 @@ static int mqtt_config_set(int argc, char **argv)
     }
 
     if (mqtt_args.broker_url->count > 0) {
-        char *url = mqtt_args.broker_url->sval[0];
-
-        // Check if "mqtt://" is not already present
-        if (strncmp(url, "mqtt://", 7) != 0) {
-            char modified_url[128]; // Adjust the size as needed
-
-            // Add "mqtt://" to the beginning of the URL
-            snprintf(modified_url, sizeof(modified_url), "mqtt://%s", url);
-
-            // Check if the modified URL is valid
-            if (is_valid_ipv4(modified_url + 7)) {
-                memset(ha_cfg.broker_url, 0, sizeof(ha_cfg.broker_url));
-                strncpy(ha_cfg.broker_url, modified_url, sizeof(ha_cfg.broker_url) - 1);
-                ESP_LOGI(TAG, "Set MQTT broker URL: %s", ha_cfg.broker_url);
-            } else {
-                ESP_LOGE(TAG, "Invalid broker URL: %s", modified_url);
-            }
-        } else {
-            // "mqtt://" is already present
-            // Check if the URL is valid
-            if (is_valid_ipv4(url + 7)) {
-                memset(ha_cfg.broker_url, 0, sizeof(ha_cfg.broker_url));
-                strncpy(ha_cfg.broker_url, url, sizeof(ha_cfg.broker_url) - 1);
-                ESP_LOGI(TAG, "Set MQTT broker URL: %s", ha_cfg.broker_url);
-            } else {
-                ESP_LOGE(TAG, "Invalid broker URL: %s", url);
-            }
+        char broker_url[sizeof(ha_cfg.broker_url)];
+        if (!normalize_broker_url(mqtt_args.broker_url->sval[0], broker_url, sizeof(broker_url))) {
+            ESP_LOGE(TAG, "Invalid or too long broker URL: %s", mqtt_args.broker_url->sval[0]);
+            return 1;
         }
+        memset(ha_cfg.broker_url, 0, sizeof(ha_cfg.broker_url));
+        strncpy(ha_cfg.broker_url, broker_url, sizeof(ha_cfg.broker_url) - 1);
+        ESP_LOGI(TAG, "Set MQTT broker URL: %s", ha_cfg.broker_url);
     }
 
     if (mqtt_args.client_id->count > 0) {
@@ -120,8 +161,12 @@ static int mqtt_config_set(int argc, char **argv)
         ESP_LOGI(TAG, "Set MQTT client ID: %s", ha_cfg.client_id);
     }
     // Save the updated configuration to NVS, then alert, don't need to transport configuration.
-    ha_cfg_set(&ha_cfg);
-    esp_event_post_to(ha_cfg_event_handle, HA_CFG_EVENT_BASE, HA_CFG_SET, NULL, NULL, portMAX_DELAY);
+    if (ha_cfg_set(&ha_cfg) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save MQTT configuration");
+        return 1;
+    }
+    esp_event_post_to(ha_cfg_event_handle, HA_CFG_EVENT_BASE, HA_CFG_SET, NULL, 0, portMAX_DELAY);
+    ESP_LOGI(TAG, "MQTT configuration saved. Reconnecting MQTT client.");
 
     return 0;
 }
@@ -131,13 +176,13 @@ static void register_mqtt_config(void)
 {
     mqtt_args.username          = arg_str0("u", "usr", "<username>", "MQTT username");
     mqtt_args.password          = arg_str0("p", "psw", "<password>", "MQTT password");
-    mqtt_args.broker_url        = arg_str0("a", "addr", "<broker_url>", "MQTT broker URL");
+    mqtt_args.broker_url        = arg_str0("a", "addr", "<broker_url>", "MQTT broker URL, e.g. 192.168.1.10 or mqtt://host:1883");
     mqtt_args.client_id         = arg_str0("c", "id", "<client_id>", "MQTT client ID");
     mqtt_args.end               = arg_end(4);
 
     const esp_console_cmd_t cmd = {
         .command  = "setmqtt",
-        .help     = "Set MQTT configuration",
+        .help     = "Set MQTT config. Example: setmqtt -a 192.168.1.10 -c indicator-01 -u user -p pass",
         .hint     = NULL,
         .func     = &mqtt_config_set,
         .argtable = &mqtt_args,
@@ -167,6 +212,7 @@ int indicator_cmd_init(void)
 
     ha_cfg_get(&ha_cfg);
     register_read_config();
+    register_mqtt_help();
     // register_set_broker_url();
     // register_mqtt_credentials();
     register_mqtt_config();

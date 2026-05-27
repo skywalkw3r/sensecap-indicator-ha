@@ -82,7 +82,7 @@ void ui_screen_broker_screen_init(void)
     lv_obj_set_x(ui_Label3, -13);
     lv_obj_set_y(ui_Label3, -60);
     lv_obj_set_align(ui_Label3, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label3, "Home Assistant address");
+    lv_label_set_text(ui_Label3, "MQTT Broker IP");
 
     ui_textarea_ip_0 = lv_textarea_create(ui_container_Inputer);
     lv_obj_set_width(ui_textarea_ip_0, 155);
@@ -93,7 +93,7 @@ void ui_screen_broker_screen_init(void)
     if("0123456789." == "") lv_textarea_set_accepted_chars(ui_textarea_ip_0, NULL);
     else lv_textarea_set_accepted_chars(ui_textarea_ip_0, "0123456789.");
     lv_textarea_set_max_length(ui_textarea_ip_0, 20);
-    lv_textarea_set_placeholder_text(ui_textarea_ip_0, "192.168.1.1");
+    lv_textarea_set_placeholder_text(ui_textarea_ip_0, "192.168.1.10");
     lv_textarea_set_one_line(ui_textarea_ip_0, true);
 
 

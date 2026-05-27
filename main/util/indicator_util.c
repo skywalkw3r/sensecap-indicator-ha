@@ -2,6 +2,8 @@
 #include <esp_system.h>
 #include <esp_log.h>
 #include <regex.h>
+#include <stdio.h>
+#include <string.h>
 
 static const char* TAG = "indicator-utils";
 

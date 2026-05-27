@@ -14,7 +14,6 @@
 
 #include "nvs.h"
 #include "view_data.h"
-#include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -48,8 +47,9 @@ typedef struct {
  * 
  * Send instance_mqtt to __app_event_handler
  */
-typedef void (*MQTTStartFn)(struct instance_mqtt_t *instance); // Example function taking an int and returning void
-typedef struct instance_mqtt {
+typedef struct instance_mqtt instance_mqtt;
+typedef void (*MQTTStartFn)(instance_mqtt *instance); // Example function taking an int and returning void
+struct instance_mqtt {
     char                     *mqtt_name;
     bool                      mqtt_connected_flag;
     esp_mqtt_client_handle_t  mqtt_client; // point
@@ -57,7 +57,8 @@ typedef struct instance_mqtt {
     esp_event_handler_t       mqtt_event_handler;
     MQTTStartFn               mqtt_starter;
     bool                      is_using;
-} instance_mqtt, *instance_mqtt_t;
+};
+typedef instance_mqtt *instance_mqtt_t;
 
 /* Functions */
 
