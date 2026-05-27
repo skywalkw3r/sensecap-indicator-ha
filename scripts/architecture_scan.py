@@ -122,6 +122,7 @@ VIEW_FILE_PATTERNS = (
 
 
 MODEL_FILE_PATTERNS = (
+    re.compile(r"(^|/)indicator_model\.c$"),
     re.compile(r"(^|/)indicator_.*_model\.c$"),
     re.compile(r"(^|/)indicator_mqtt\.c$"),
     re.compile(r"(^|/)esp32_rp2040\.c$"),
