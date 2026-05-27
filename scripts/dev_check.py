@@ -30,7 +30,7 @@ def main() -> int:
     run("Architecture scan", ["python3", "scripts/architecture_scan.py"])
 
     if not args.skip_build:
-        run("Firmware build", ["./dev", "build"])
+        run("Firmware build", [sys.executable, "scripts/dev.py", "build"])
 
     print("\ndev_check: OK")
     return 0
