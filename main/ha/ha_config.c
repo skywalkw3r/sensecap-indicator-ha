@@ -1,6 +1,8 @@
 #include <string.h>
 
-#include "ha.h"
+#include "ha_config.h"
+#include "ha_mqtt.h"
+#include "view_data.h"
 #include "home_assistant_config.h"
 #include "indicator_storage_nvs.h"
 #include "lv_port.h"

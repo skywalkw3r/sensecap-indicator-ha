@@ -1,5 +1,6 @@
-#include "ha.h"
-#include "ha_switch_screen.h"
+#include "ha_switch.h"
+#include "ha_mqtt.h"
+#include "view_data.h"
 #include "home_assistant_config.h"
 #include "cJSON.h"
 #include "indicator_storage_nvs.h"

@@ -1,4 +1,6 @@
-#include "ha.h"
+#include "ha_sensor.h"
+#include "ha_mqtt.h"
+#include "view_data.h"
 #include "home_assistant_config.h"
 #include "cJSON.h"
 #include "esp_log.h"
