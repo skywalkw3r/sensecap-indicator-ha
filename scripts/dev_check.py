@@ -29,6 +29,7 @@ def main() -> int:
 
     run("Architecture scan", ["python3", "scripts/architecture_scan.py"])
     run("RGB LCD config", ["python3", "scripts/test_lcd_rgb_config.py"])
+    run("UI geometry", ["python3", "scripts/test_ui_geometry.py"])
 
     if not args.skip_build:
         run("Firmware build", [sys.executable, "scripts/dev.py", "build"])

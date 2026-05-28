@@ -1,28 +1,48 @@
 #include "nav.h"
 
 #include "lv_port.h"
+#include "sdkconfig.h"
 
-#define NAV_TILE_WIDTH  480
-#define NAV_TILE_HEIGHT 800
+#define NAV_TILE_WIDTH  CONFIG_LCD_EVB_SCREEN_WIDTH
+#define NAV_TILE_HEIGHT CONFIG_LCD_EVB_SCREEN_HEIGHT
 
 static lv_obj_t *s_tileview;
 static lv_obj_t *s_tiles[NAV_TILE_COUNT];
 
+static void nav_style_screen_obj(lv_obj_t *obj) {
+	lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(obj, lv_color_hex(0x101418), LV_PART_MAIN);
+	lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+	lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN);
+	lv_obj_set_style_radius(obj, 0, LV_PART_MAIN);
+	lv_obj_set_style_pad_all(obj, 0, LV_PART_MAIN);
+}
+
 int nav_init(void) {
 	lv_port_sem_take();
 
+	lv_display_t *display = lv_display_get_default();
+	lv_theme_t *theme = lv_theme_default_init(display,
+											  lv_palette_main(LV_PALETTE_BLUE),
+											  lv_palette_main(LV_PALETTE_RED),
+											  true,
+											  LV_FONT_DEFAULT);
+	lv_display_set_theme(display, theme);
+
+	lv_obj_t *screen = lv_screen_active();
+	nav_style_screen_obj(screen);
+
 	s_tileview = lv_tileview_create(lv_screen_active());
 	lv_obj_set_size(s_tileview, NAV_TILE_WIDTH, NAV_TILE_HEIGHT);
+	lv_obj_set_pos(s_tileview, 0, 0);
 	lv_obj_set_scrollbar_mode(s_tileview, LV_SCROLLBAR_MODE_OFF);
-	lv_obj_set_style_bg_color(s_tileview, lv_color_black(), LV_PART_MAIN);
-	lv_obj_set_style_bg_opa(s_tileview, LV_OPA_COVER, LV_PART_MAIN);
+	nav_style_screen_obj(s_tileview);
 
 	for (int i = 0; i < NAV_TILE_COUNT; i++) {
 		s_tiles[i] = lv_tileview_add_tile(s_tileview, i, 0,
 										  LV_DIR_LEFT | LV_DIR_RIGHT);
 		lv_obj_set_size(s_tiles[i], NAV_TILE_WIDTH, NAV_TILE_HEIGHT);
-		lv_obj_set_style_bg_color(s_tiles[i], lv_color_black(), LV_PART_MAIN);
-		lv_obj_set_style_bg_opa(s_tiles[i], LV_OPA_COVER, LV_PART_MAIN);
+		nav_style_screen_obj(s_tiles[i]);
 	}
 
 	lv_port_sem_give();

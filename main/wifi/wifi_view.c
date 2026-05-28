@@ -6,6 +6,7 @@
 #include "lv_port.h"
 #include "indicator_util.h"
 #include "nav.h"
+#include "sdkconfig.h"
 
 LV_IMAGE_DECLARE(ui_img_wifi_1_png);
 LV_IMAGE_DECLARE(ui_img_wifi_2_png);
@@ -48,13 +49,16 @@ static void _ensure_wifi_modal(void) {
     if(s_wifi_modal) return;
 
     s_wifi_modal = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(s_wifi_modal, 480, 800);
+    lv_obj_set_size(s_wifi_modal, CONFIG_LCD_EVB_SCREEN_WIDTH, CONFIG_LCD_EVB_SCREEN_HEIGHT);
     lv_obj_set_align(s_wifi_modal, LV_ALIGN_CENTER);
     lv_obj_remove_flag(s_wifi_modal, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(s_wifi_modal, lv_color_hex(0x101418),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(s_wifi_modal, LV_OPA_COVER,
                             LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(s_wifi_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(s_wifi_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(s_wifi_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_flag(s_wifi_modal, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t *header = lv_obj_create(s_wifi_modal);

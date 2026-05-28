@@ -8,6 +8,7 @@
 #include "lv_port.h"
 #include "indicator_util.h"
 #include "esp_log.h"
+#include "sdkconfig.h"
 
 #define MAX_BROKER_URL_LEN 128
 
@@ -113,13 +114,16 @@ static void _ensure_broker_modal(void)
     }
 
     s_broker_modal = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(s_broker_modal, 480, 800);
+    lv_obj_set_size(s_broker_modal, CONFIG_LCD_EVB_SCREEN_WIDTH, CONFIG_LCD_EVB_SCREEN_HEIGHT);
     lv_obj_set_align(s_broker_modal, LV_ALIGN_CENTER);
     lv_obj_remove_flag(s_broker_modal, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(s_broker_modal, lv_color_hex(0x101418),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(s_broker_modal, LV_OPA_COVER,
                             LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(s_broker_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(s_broker_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(s_broker_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_flag(s_broker_modal, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t *header = lv_obj_create(s_broker_modal);
