@@ -22,6 +22,16 @@ static void nav_style_static_obj(lv_obj_t *obj) {
 	nav_style_base_obj(obj);
 }
 
+static lv_dir_t nav_tile_scroll_dir(int tile_idx) {
+	if (tile_idx == 0) {
+		return LV_DIR_RIGHT;
+	}
+	if (tile_idx == NAV_TILE_COUNT - 1) {
+		return LV_DIR_LEFT;
+	}
+	return LV_DIR_LEFT | LV_DIR_RIGHT;
+}
+
 int nav_init(void) {
 	lv_port_sem_take();
 
@@ -40,11 +50,14 @@ int nav_init(void) {
 	lv_obj_set_size(s_tileview, NAV_TILE_WIDTH, NAV_TILE_HEIGHT);
 	lv_obj_set_pos(s_tileview, 0, 0);
 	lv_obj_set_scrollbar_mode(s_tileview, LV_SCROLLBAR_MODE_OFF);
+	lv_obj_remove_flag(s_tileview, LV_OBJ_FLAG_SCROLL_ELASTIC |
+								  LV_OBJ_FLAG_SCROLL_MOMENTUM |
+								  LV_OBJ_FLAG_SCROLL_CHAIN);
 	nav_style_base_obj(s_tileview);
 
 	for (int i = 0; i < NAV_TILE_COUNT; i++) {
 		s_tiles[i] = lv_tileview_add_tile(s_tileview, i, 0,
-										  LV_DIR_LEFT | LV_DIR_RIGHT);
+										  nav_tile_scroll_dir(i));
 		lv_obj_set_size(s_tiles[i], NAV_TILE_WIDTH, NAV_TILE_HEIGHT);
 		nav_style_static_obj(s_tiles[i]);
 	}

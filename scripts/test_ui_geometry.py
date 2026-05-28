@@ -36,6 +36,15 @@ class UiGeometryTests(unittest.TestCase):
         self.assertIn("nav_style_base_obj(s_tileview)", text)
         self.assertNotIn("nav_style_static_obj(s_tileview)", text)
 
+    def test_tileview_prevents_edge_overscroll_offset(self) -> None:
+        text = NAV.read_text()
+
+        self.assertIn("LV_OBJ_FLAG_SCROLL_ELASTIC", text)
+        self.assertIn("LV_OBJ_FLAG_SCROLL_MOMENTUM", text)
+        self.assertIn("LV_OBJ_FLAG_SCROLL_CHAIN", text)
+        self.assertIn("return LV_DIR_RIGHT;", text)
+        self.assertIn("return LV_DIR_LEFT;", text)
+
     def test_temperature_unit_uses_product_degree_symbol(self) -> None:
         offenders: list[str] = []
         for path in MAIN.rglob("*.c"):
