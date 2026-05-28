@@ -30,6 +30,12 @@ class UiGeometryTests(unittest.TestCase):
         self.assertIn("lv_theme_default_init", text)
         self.assertIn("lv_display_set_theme", text)
 
+    def test_tileview_remains_scrollable_for_touch_swipes(self) -> None:
+        text = NAV.read_text()
+
+        self.assertIn("nav_style_base_obj(s_tileview)", text)
+        self.assertNotIn("nav_style_static_obj(s_tileview)", text)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
