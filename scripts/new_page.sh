@@ -126,7 +126,7 @@ void ${SNAKE}_view_init(void) {
     lv_port_sem_take();
 
     s_overlay = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(s_overlay, 480, 800);
+    lv_obj_set_size(s_overlay, 480, 480);
     lv_obj_set_style_bg_color(s_overlay, lv_color_hex(0x1A1A1A), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_overlay, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_overlay, 0, LV_PART_MAIN);

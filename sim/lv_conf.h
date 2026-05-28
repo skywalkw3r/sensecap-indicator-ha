@@ -28,8 +28,11 @@
 /*====================
    MEMORY SETTINGS
  *====================*/
-#define LV_MEM_CUSTOM 0
-#define LV_MEM_SIZE   (512U * 1024U)  /* 512 KB */
+/* Desktop sim: use the C-library allocator (effectively unlimited heap).
+ * The builtin 512 KB pool is too small for a full-screen lv_snapshot_take
+ * (480×480×4 ≈ 900 KB) used by the headless screenshot path. */
+#define LV_USE_STDLIB_MALLOC LV_STDLIB_CLIB
+#define LV_MEM_SIZE          (512U * 1024U)  /* unused with CLIB allocator */
 
 /*====================
    HAL SETTINGS
@@ -73,6 +76,9 @@
 #define LV_USE_CHART     1
 #define LV_USE_KEYBOARD  1
 #define LV_USE_SPAN      0
+
+/* Off-screen render to a buffer — used by the sim's headless screenshot path. */
+#define LV_USE_SNAPSHOT  1
 
 /*====================
    FONTS

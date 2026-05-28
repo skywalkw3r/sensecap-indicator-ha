@@ -7,7 +7,7 @@ Agent 开发指南。在修改代码之前请先读完本文件。
 ## 项目概述
 
 ESP32-S3 + RP2040 固件，LVGL 9.5.0（ESP Component Manager 管理），ESP-IDF 5.4.3，FreeRTOS。
-显示屏：480×800 RGB565，触摸输入。Home Assistant 通过 MQTT 集成。
+显示屏：480×480 RGB565，触摸输入。Home Assistant 通过 MQTT 集成。
 
 ---
 
@@ -137,7 +137,7 @@ my_page_view_init();
 不占 tile，浮在最上层：
 ```c
 lv_obj_t *overlay = lv_obj_create(lv_layer_top());
-lv_obj_set_size(overlay, 480, 800);
+lv_obj_set_size(overlay, 480, 480);
 lv_obj_set_style_bg_color(overlay, lv_color_hex(0x1A1A1A), 0);
 lv_obj_set_style_bg_opa(overlay, LV_OPA_COVER, 0);
 lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);   // 初始隐藏
@@ -205,7 +205,6 @@ const lv_image_dsc_t ui_img_xxx = {
 | `main/lv_port.c` | BSP 硬件边界，改动影响整个显示系统，非显示硬件任务不动 |
 | `components/bsp/` | 硬件驱动层 |
 | `managed_components/` | 由 ESP Component Manager 自动管理，不手动编辑 |
-| `main/app/` | 历史遗留目录，不在此新建文件 |
 
 ---
 

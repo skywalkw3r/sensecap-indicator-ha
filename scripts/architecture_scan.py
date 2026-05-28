@@ -56,31 +56,31 @@ SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
 
 OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, str], str] = {
     (
-        "main/app/indicator_btn.c",
+        "main/btn/btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
         "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_SINGLE_CLICK, _btn_click_callback, NULL);",
     ): "existing single-click button registration uses BSP callback API",
     (
-        "main/app/indicator_btn.c",
+        "main/btn/btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_DOUBLE_CLICK, _btn_double_click_callback,",
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_DOUBLE_CLICK, _btn_double_click_callback, NULL);",
     ): "existing double-click button registration uses BSP callback API",
     (
-        "main/app/indicator_btn.c",
+        "main/btn/btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_START,",
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_START, _btn_press_start_callback, NULL);",
     ): "existing long-press-start button registration uses BSP callback API",
     (
-        "main/app/indicator_btn.c",
+        "main/btn/btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
-        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_HOLD,",
+        "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_LONG_PRESS_HOLD, _btn_long_press_hold_callback, NULL);",
     ): "existing long-press-hold button registration uses BSP callback API",
     (
-        "main/app/indicator_btn.c",
+        "main/btn/btn.c",
         "service-register-callback",
         "bsp_btn_register_callback",
         "bsp_btn_register_callback(BOARD_BTN_ID_USER, BUTTON_PRESS_UP, _btn_press_up_callback, NULL);",
@@ -291,7 +291,7 @@ def scan_shared_bsp_includes(path: Path, text: str, findings: list[Finding]) -> 
 
 
 def scan_event_payload_comments(path: Path, text: str, findings: list[Finding]) -> None:
-    if rel_key(path) not in {"main/view_data.h", "main/app/app_events.h"}:
+    if rel_key(path) not in {"main/view_data.h"}:
         return
     for idx, line in enumerate(text.splitlines(), start=1):
         match = EVENT_ENUM_RE.match(line)
