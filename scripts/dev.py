@@ -82,12 +82,21 @@ def run_idf(idf_args: list[str]) -> int:
 def run_idf_capture(idf_args: list[str]) -> subprocess.CompletedProcess[str]:
     cmd = ["idf.py", *idf_args]
     print("$ " + " ".join(cmd), flush=True)
-    result = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
-    if result.stdout:
-        print(result.stdout, end="")
-    if result.stderr:
-        print(result.stderr, end="", file=sys.stderr)
-    return result
+    proc = subprocess.Popen(
+        cmd,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+    )
+    output: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        output.append(line)
+        print(line, end="", flush=True)
+    returncode = proc.wait()
+    return subprocess.CompletedProcess(cmd, returncode, "".join(output), "")
 
 
 def run_pio(pio_args: list[str]) -> int:
