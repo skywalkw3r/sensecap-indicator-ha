@@ -36,6 +36,15 @@ class UiGeometryTests(unittest.TestCase):
         self.assertIn("nav_style_base_obj(s_tileview)", text)
         self.assertNotIn("nav_style_static_obj(s_tileview)", text)
 
+    def test_temperature_unit_uses_product_degree_symbol(self) -> None:
+        offenders: list[str] = []
+        for path in MAIN.rglob("*.c"):
+            text = path.read_text()
+            if "deg C" in text:
+                offenders.append(str(path.relative_to(ROOT)))
+
+        self.assertEqual([], offenders)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

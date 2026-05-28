@@ -46,6 +46,11 @@ class LcdRgbConfigTests(unittest.TestCase):
         self.assertIn("CONFIG_LCD_LVGL_FULL_REFRESH=y", text)
         self.assertNotIn("CONFIG_LCD_LVGL_DIRECT_MODE=y", text)
 
+    def test_lvgl_refresh_period_is_fast_enough_for_swipe_motion(self) -> None:
+        text = SDKCONFIG_DEFAULTS.read_text()
+
+        self.assertIn("CONFIG_LV_DEF_REFR_PERIOD=10", text)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

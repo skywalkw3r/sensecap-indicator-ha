@@ -71,13 +71,21 @@ static void _ensure_wifi_modal(void) {
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *back = lv_button_create(header);
-    lv_obj_set_size(back, 100, 50);
-    lv_obj_set_pos(back, 10, 17);
-    lv_obj_set_style_bg_color(back, lv_color_hex(0x292831),
+    lv_obj_set_size(back, 64, 50);
+    lv_obj_set_pos(back, 0, 17);
+    lv_obj_set_style_bg_color(back, lv_color_hex(0x101418),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(back, LV_OPA_COVER,
+                            LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(back, _on_wifi_modal_back, LV_EVENT_CLICKED, NULL);
     lv_obj_t *back_label = lv_label_create(back);
-    lv_label_set_text(back_label, "Back");
+    lv_label_set_text(back_label, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_color(back_label, lv_color_white(),
+                                LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_center(back_label);
 
     lv_obj_t *title = lv_label_create(header);
