@@ -68,7 +68,7 @@ def convert_one(path: Path) -> str:
 
     new_text = text[:md.start(2)] + new_body + text[md.end(2):]
     new_text = HEADER_STRIDE_RE.sub(f".header.stride = {w * 2}", new_text)
-    path.write_text(new_text)
+    path.write_text(new_text.rstrip() + "\n")
     return f"ok: {w}x{h}, stride {stride}->{w*2}, {len(planar)} bytes"
 
 

@@ -578,4 +578,3 @@ const lv_image_dsc_t ui_img_ic_switch1_on_png = {
     .header.cf = LV_COLOR_FORMAT_RGB565A8,
     .data = ui_img_ic_switch1_on_png_data
 };
-
