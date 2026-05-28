@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>        /* getenv */
+#include <string.h>
 
 #define SIM_WIDTH  480
 #define SIM_HEIGHT 480
@@ -104,7 +105,9 @@ static void run_screenshot_mode(const char *path) {
         lv_timer_handler();
         SDL_Delay(10);
     }
-    lv_draw_buf_t *snap = lv_snapshot_take(lv_screen_active(), LV_COLOR_FORMAT_ARGB8888);
+    const char *layer = getenv("SIM_SCREENSHOT_LAYER");
+    lv_obj_t *target = (layer && strcmp(layer, "top") == 0) ? lv_layer_top() : lv_screen_active();
+    lv_draw_buf_t *snap = lv_snapshot_take(target, LV_COLOR_FORMAT_ARGB8888);
     if (!snap) {
         fprintf(stderr, "[sim] lv_snapshot_take returned NULL\n");
         return;

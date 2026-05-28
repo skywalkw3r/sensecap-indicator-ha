@@ -18,6 +18,7 @@
 #include "nav/nav.h"
 #include "display/display_view.h"
 #include "sensor/sensor_view.h"
+#include "settings/settings_view.h"
 #include "wifi/wifi_view.h"
 #include "ha/ha_switch_screen.h"
 
@@ -25,6 +26,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     printf("[sim] sensecap-indicator simulator starting\n");
@@ -39,6 +41,12 @@ int main(void) {
     view_sensor_init();
     indicator_wifi_view_init();
     ha_switch_screen_create();
+    settings_view_init();
+
+    const char *open_settings = getenv("SIM_OPEN_SETTINGS");
+    if (open_settings && *open_settings) {
+        settings_view_show();
+    }
 
     /* 3. Start mock data injection (Step 5) */
     mock_sensors_start();

@@ -54,6 +54,7 @@ file(GLOB ASSET_SOURCES "${FW_ROOT}/main/assets/*.c")
 set(UI_SOURCES
     ${FW_ROOT}/main/nav/nav.c
     ${FW_ROOT}/main/display/display_view.c
+    ${FW_ROOT}/main/settings/settings_view.c
     ${FW_ROOT}/main/sensor/sensor_view.c
     ${FW_ROOT}/main/ha/ha_switch_screen.c
     ${FW_ROOT}/main/wifi/wifi_connect_screen.c
@@ -90,6 +91,7 @@ target_include_directories(sensecap_sim PRIVATE
     ${FW_ROOT}/main/ha
     ${FW_ROOT}/main/sensor
     ${FW_ROOT}/main/display
+    ${FW_ROOT}/main/settings
     ${FW_ROOT}/main/wifi
     ${FW_ROOT}/main/util
     ${FW_ROOT}/main/rp2040

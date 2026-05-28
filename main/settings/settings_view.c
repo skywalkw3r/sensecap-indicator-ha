@@ -7,7 +7,9 @@
 #include "sdkconfig.h"
 #include "view_data.h"
 
-LV_FONT_DECLARE(ui_font_font0);
+LV_FONT_DECLARE(lv_font_montserrat_20);
+LV_FONT_DECLARE(lv_font_montserrat_24);
+LV_FONT_DECLARE(lv_font_montserrat_28);
 
 static const char *TAG = "settings-view";
 
@@ -61,7 +63,7 @@ static void settings_on_back(lv_event_t *e)
 	}
 }
 
-static void settings_show_modal(void)
+void settings_view_show(void)
 {
 	if(!s_settings_modal)
 	{
@@ -76,7 +78,7 @@ static void settings_on_gear(lv_event_t *e)
 {
 	if(lv_event_get_code(e) == LV_EVENT_CLICKED)
 	{
-		settings_show_modal();
+		settings_view_show();
 	}
 }
 
@@ -85,6 +87,7 @@ static void settings_style_card(lv_obj_t *card, lv_color_t color)
 	lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 	lv_obj_set_style_bg_color(card, color, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_bg_opa(card, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_bg_opa(card, LV_OPA_80, LV_PART_MAIN | LV_STATE_PRESSED);
 	lv_obj_set_style_border_width(card, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_radius(card, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_shadow_width(card, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -92,49 +95,60 @@ static void settings_style_card(lv_obj_t *card, lv_color_t color)
 	lv_obj_set_style_text_color(card, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
-static void settings_create_card(lv_obj_t *parent, int32_t x, lv_align_t align,
+static void settings_create_card(lv_obj_t *parent, int32_t x, int32_t y,
 								 lv_color_t color, const char *label,
 								 const char *icon, lv_event_cb_t cb)
 {
 	lv_obj_t *card = lv_button_create(parent);
-	lv_obj_set_size(card, 140, 160);
-	lv_obj_set_x(card, x);
-	lv_obj_set_y(card, 0);
-	lv_obj_set_align(card, align);
+	lv_obj_set_size(card, 150, 150);
+	lv_obj_set_pos(card, x, y);
 	settings_style_card(card, color);
 	lv_obj_add_event_cb(card, cb, LV_EVENT_CLICKED, NULL);
 
 	lv_obj_t *icon_label = lv_label_create(card);
 	lv_label_set_text(icon_label, icon);
+	lv_obj_set_style_text_font(icon_label, &lv_font_montserrat_28,
+							   LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_text_color(icon_label, lv_color_white(),
+								LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_align(icon_label, LV_ALIGN_CENTER);
-	lv_obj_set_y(icon_label, -24);
+	lv_obj_set_y(icon_label, -26);
 
 	lv_obj_t *title = lv_label_create(card);
 	lv_label_set_text(title, label);
-	lv_obj_set_style_text_font(title, &ui_font_font0,
+	lv_obj_set_style_text_font(title, &lv_font_montserrat_20,
 							   LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_text_color(title, lv_color_white(),
+								LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_align(title, LV_ALIGN_CENTER);
-	lv_obj_set_y(title, 32);
+	lv_obj_set_y(title, 35);
 }
 
 static void settings_create_gear_button(lv_obj_t *tile)
 {
 	lv_obj_t *button = lv_button_create(tile);
-	lv_obj_set_size(button, 60, 60);
+	lv_obj_set_size(button, 52, 52);
 	lv_obj_set_align(button, LV_ALIGN_TOP_LEFT);
-	lv_obj_set_pos(button, 10, 10);
+	lv_obj_set_pos(button, 14, 14);
 	lv_obj_remove_flag(button, LV_OBJ_FLAG_SCROLLABLE);
 	lv_obj_set_style_bg_color(button, lv_color_hex(0x101418),
 							  LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_bg_opa(button, LV_OPA_COVER,
+	lv_obj_set_style_bg_opa(button, LV_OPA_TRANSP,
 							LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_bg_color(button, lv_color_hex(0x2a3036),
+							  LV_PART_MAIN | LV_STATE_PRESSED);
+	lv_obj_set_style_bg_opa(button, LV_OPA_40,
+							LV_PART_MAIN | LV_STATE_PRESSED);
 	lv_obj_set_style_border_width(button, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_radius(button, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_radius(button, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_pad_all(button, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_shadow_width(button, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_add_event_cb(button, settings_on_gear, LV_EVENT_CLICKED, NULL);
 
 	lv_obj_t *label = lv_label_create(button);
 	lv_label_set_text(label, LV_SYMBOL_SETTINGS);
+	lv_obj_set_style_text_font(label, &lv_font_montserrat_28,
+							   LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_text_color(label, lv_color_white(),
 								LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_center(label);
@@ -197,30 +211,30 @@ static void settings_create_modal(void)
 	lv_obj_center(back_label);
 
 	lv_obj_t *title = lv_label_create(header);
-	lv_label_set_text(title, "Setting");
-	lv_obj_set_style_text_font(title, &ui_font_font0,
+	lv_label_set_text(title, "Settings");
+	lv_obj_set_style_text_font(title, &lv_font_montserrat_24,
 							   LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_text_color(title, lv_color_white(),
 								LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_align(title, LV_ALIGN_BOTTOM_MID);
 
-	settings_create_card(s_settings_modal, 90, LV_ALIGN_LEFT_MID,
+	settings_create_card(s_settings_modal, 80, 150,
 						 lv_color_hex(0x4EACE4), "WiFi", LV_SYMBOL_WIFI,
 						 settings_open_wifi);
-	settings_create_card(s_settings_modal, -90, LV_ALIGN_RIGHT_MID,
+	settings_create_card(s_settings_modal, 250, 150,
 						 lv_color_hex(0xEEBF41), "Display", LV_SYMBOL_IMAGE,
 						 settings_open_display);
 
 	lv_obj_t *broker = lv_button_create(s_settings_modal);
 	lv_obj_set_size(broker, 300, 60);
-	lv_obj_set_x(broker, 0);
-	lv_obj_set_y(broker, 120);
-	lv_obj_set_align(broker, LV_ALIGN_CENTER);
+	lv_obj_set_pos(broker, 90, 330);
 	settings_style_card(broker, lv_color_hex(0xE66D39));
 	lv_obj_add_event_cb(broker, settings_open_broker, LV_EVENT_CLICKED, NULL);
 
 	lv_obj_t *broker_label = lv_label_create(broker);
 	lv_label_set_text(broker_label, "Change MQTT Broker Address");
+	lv_obj_set_style_text_color(broker_label, lv_color_white(),
+								LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_center(broker_label);
 }
 
