@@ -99,4 +99,11 @@ build
 
 # PlatformIO
 .pio/
-.claude/worktrees/
+
+# Claude Code: ignore everything under .claude/ except project-shared skills.
+# Subagent worktrees, session state, etc. land here and shouldn't be committed.
+.claude/
+!.claude/skills/
+
+# ESP-IDF Component Manager downloads — fetched from idf_component.yml on build.
+managed_components/
