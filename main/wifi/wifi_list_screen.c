@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include "wifi_list_screen.h"
 #include "indicator_util.h"

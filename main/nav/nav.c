@@ -11,7 +11,7 @@ static lv_obj_t *s_tiles[NAV_TILE_COUNT];
 int nav_init(void) {
 	lv_port_sem_take();
 
-	s_tileview = lv_tileview_create(lv_scr_act());
+	s_tileview = lv_tileview_create(lv_screen_active());
 	lv_obj_set_size(s_tileview, NAV_TILE_WIDTH, NAV_TILE_HEIGHT);
 	lv_obj_set_scrollbar_mode(s_tileview, LV_SCROLLBAR_MODE_OFF);
 	lv_obj_set_style_bg_color(s_tileview, lv_color_black(), LV_PART_MAIN);
@@ -43,5 +43,5 @@ void nav_go_tile(int tile_idx) {
 		return;
 	}
 
-	lv_obj_set_tile_id(s_tileview, tile_idx, 0, LV_ANIM_ON);
+	lv_tileview_set_tile_by_index(s_tileview, tile_idx, 0, LV_ANIM_ON);
 }

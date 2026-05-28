@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include "wifi_connect_screen.h"
 #include "view_data.h"

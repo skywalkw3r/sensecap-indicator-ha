@@ -37,22 +37,22 @@ static const char *_get_broker_url(const void *event_data)
 
 static void btn_event_cb(lv_event_t *e)
 {
-    lv_obj_t *obj = lv_event_get_current_target(e);
-    const char *btn_text = lv_msgbox_get_active_btn_text(obj);
-    LV_LOG_USER("Button %s clicked", btn_text ? btn_text : "");
-    if (btn_text && strcmp(btn_text, "OK") == 0) {
-        lv_msgbox_close(obj);
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        lv_obj_t *mbox = (lv_obj_t *)lv_event_get_user_data(e);
+        lv_msgbox_close(mbox);
     }
 }
 
 static void show_message_box(const char *message, lv_color_t color)
 {
-    static const char *btns[] = {"OK", ""};
-    lv_obj_t *mbox = lv_msgbox_create(lv_layer_top(), "Notification", message, btns, true);
+    lv_obj_t *mbox = lv_msgbox_create(NULL);
+    lv_msgbox_add_title(mbox, "Notification");
+    lv_msgbox_add_text(mbox, message);
+    lv_obj_t *ok_btn = lv_msgbox_add_footer_button(mbox, "OK");
 
     lv_obj_set_style_bg_color(mbox, color, LV_PART_MAIN);
     lv_obj_set_style_text_color(mbox, lv_color_white(), LV_PART_MAIN);
-    lv_obj_add_event_cb(mbox, btn_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ok_btn, btn_event_cb, LV_EVENT_CLICKED, mbox);
     lv_obj_center(mbox);
 }
 
@@ -91,7 +91,7 @@ static void _on_ip_textarea_clicked(lv_event_t *e)
         return;
     }
 
-    lv_obj_clear_flag(s_broker_keyboard, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(s_broker_keyboard, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void _on_broker_keyboard_done(lv_event_t *e)
@@ -115,7 +115,7 @@ static void _ensure_broker_modal(void)
     s_broker_modal = lv_obj_create(lv_layer_top());
     lv_obj_set_size(s_broker_modal, 480, 800);
     lv_obj_set_align(s_broker_modal, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(s_broker_modal, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(s_broker_modal, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(s_broker_modal, lv_color_hex(0x101418),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(s_broker_modal, LV_OPA_COVER,
@@ -125,13 +125,13 @@ static void _ensure_broker_modal(void)
     lv_obj_t *header = lv_obj_create(s_broker_modal);
     lv_obj_set_size(header, 480, 85);
     lv_obj_set_align(header, LV_ALIGN_TOP_MID);
-    lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP,
                             LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_opa(header, LV_OPA_TRANSP,
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_t *back = lv_btn_create(header);
+    lv_obj_t *back = lv_button_create(header);
     lv_obj_set_size(back, 100, 50);
     lv_obj_set_pos(back, 10, 17);
     lv_obj_set_style_bg_color(back, lv_color_hex(0x292831),
@@ -151,7 +151,7 @@ static void _ensure_broker_modal(void)
     lv_obj_set_size(container, 420, 160);
     lv_obj_set_align(container, LV_ALIGN_TOP_MID);
     lv_obj_set_y(container, 120);
-    lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(container, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *input_title = lv_label_create(container);
     lv_label_set_text(input_title, "MQTT Broker IP");
@@ -181,7 +181,7 @@ static void _ensure_broker_modal(void)
     lv_obj_set_align(suffix, LV_ALIGN_CENTER);
     lv_obj_set_x(suffix, 85);
 
-    lv_obj_t *confirm = lv_btn_create(container);
+    lv_obj_t *confirm = lv_button_create(container);
     lv_obj_set_size(confirm, 94, 50);
     lv_obj_set_align(confirm, LV_ALIGN_RIGHT_MID);
     lv_obj_set_style_bg_color(confirm, lv_color_hex(0x4AAEE6),
@@ -227,7 +227,7 @@ static void _show_broker_modal(void)
         update_ip_textfield(broker_url);
     }
     if (s_broker_modal) {
-        lv_obj_clear_flag(s_broker_modal, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(s_broker_modal, LV_OBJ_FLAG_HIDDEN);
     }
 }
 

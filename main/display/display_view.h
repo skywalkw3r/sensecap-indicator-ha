@@ -7,10 +7,10 @@
 extern "C" {
 #endif
 
+int indicator_display_view_init(void);
+
 void brighness_cfg_event_cb(lv_event_t* e);
-
 void display_cfg_apply_event_cb(lv_event_t* e);
-
 void brighness_update_callback(lv_event_t* e);
 
 #ifdef __cplusplus
