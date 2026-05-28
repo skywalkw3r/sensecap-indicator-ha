@@ -24,5 +24,9 @@ int indicator_view_init(void) {
 	indicator_ha_view_init();
 #endif
 
+#ifdef SETTINGS_H
+	settings_view_init();
+#endif
+
 	return 0;
 }

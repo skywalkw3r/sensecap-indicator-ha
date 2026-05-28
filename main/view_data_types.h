@@ -11,8 +11,10 @@ extern "C" {
 /* ── Screen / navigation ──────────────────────────────────────────────────── */
 
 enum start_screen {
-    SCREEN_SENSECAP_LOG,
-    SCREEN_WIFI_CONFIG,
+    SCREEN_SENSECAP_LOG = 0,
+    SCREEN_WIFI_CONFIG = 1,
+    SCREEN_DISPLAY_MODAL = 2,
+    SCREEN_BROKER_MODAL = 3,
 };
 
 /* ── WiFi ─────────────────────────────────────────────────────────────────── */

@@ -9,6 +9,8 @@
 
 #include "display.h"
 
+#include "settings.h"
+
 #include "rp2040.h"
 
 #include "sensor.h"

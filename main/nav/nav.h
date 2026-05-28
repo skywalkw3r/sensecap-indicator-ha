@@ -3,7 +3,7 @@
 
 #include "lvgl.h"
 
-/* Tile indices for the three main swipeable screens */
+/* Tile indices for the main swipeable screens */
 #define NAV_TILE_HA_DATA  0   /* sensor data view */
 #define NAV_TILE_HA_CTRL  1   /* switch control view */
 #define NAV_TILE_HA_MIX   2   /* mixed sensors+switches view */

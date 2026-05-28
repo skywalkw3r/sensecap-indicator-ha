@@ -12,10 +12,6 @@
 
 #define MAX_BROKER_URL_LEN 128
 
-enum {
-    SCREEN_BROKER_MODAL = 3,
-};
-
 static const char *TAG = "ha-config";
 
 static lv_obj_t *s_broker_modal = NULL;
@@ -116,7 +112,8 @@ static void _ensure_broker_modal(void)
     s_broker_modal = lv_obj_create(lv_layer_top());
     lv_obj_set_size(s_broker_modal, CONFIG_LCD_EVB_SCREEN_WIDTH, CONFIG_LCD_EVB_SCREEN_HEIGHT);
     lv_obj_set_align(s_broker_modal, LV_ALIGN_CENTER);
-    lv_obj_remove_flag(s_broker_modal, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_broker_modal, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(s_broker_modal, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_set_style_bg_color(s_broker_modal, lv_color_hex(0x101418),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(s_broker_modal, LV_OPA_COVER,
@@ -138,11 +135,21 @@ static void _ensure_broker_modal(void)
     lv_obj_t *back = lv_button_create(header);
     lv_obj_set_size(back, 100, 50);
     lv_obj_set_pos(back, 10, 17);
-    lv_obj_set_style_bg_color(back, lv_color_hex(0x292831),
-                              LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(back, LV_OPA_TRANSP,
+                            LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(back, lv_color_hex(0x2a3036),
+                              LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(back, LV_OPA_40,
+                            LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_border_width(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(back, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(back, _on_broker_back, LV_EVENT_CLICKED, NULL);
     lv_obj_t *back_label = lv_label_create(back);
-    lv_label_set_text(back_label, "Back");
+    lv_label_set_text(back_label, LV_SYMBOL_LEFT " Back");
+    lv_obj_set_style_text_color(back_label, lv_color_hex(0xe7ecef),
+                                LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_center(back_label);
 
     lv_obj_t *title = lv_label_create(header);
@@ -232,6 +239,7 @@ static void _show_broker_modal(void)
     }
     if (s_broker_modal) {
         lv_obj_remove_flag(s_broker_modal, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(s_broker_modal);
     }
 }
 
