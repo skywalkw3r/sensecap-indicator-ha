@@ -11,6 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parent.parent
 BSP_LCD = ROOT / "components/bsp/src/peripherals/bsp_lcd.c"
 LV_PORT = ROOT / "main/lv_port.c"
+SDKCONFIG_DEFAULTS = ROOT / "sdkconfig.defaults"
 
 
 class LcdRgbConfigTests(unittest.TestCase):
@@ -38,6 +39,12 @@ class LcdRgbConfigTests(unittest.TestCase):
         self.assertIsNotNone(match)
         assert match is not None
         self.assertGreaterEqual(int(match.group(1)), 8192)
+
+    def test_avoid_tear_uses_full_refresh_not_direct_mode(self) -> None:
+        text = SDKCONFIG_DEFAULTS.read_text()
+
+        self.assertIn("CONFIG_LCD_LVGL_FULL_REFRESH=y", text)
+        self.assertNotIn("CONFIG_LCD_LVGL_DIRECT_MODE=y", text)
 
 
 if __name__ == "__main__":
