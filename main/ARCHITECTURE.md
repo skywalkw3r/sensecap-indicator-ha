@@ -1,6 +1,6 @@
 # Firmware Architecture
 
-SenseCAP Indicator firmware for ESP32-S3 + RP2040. ESP-IDF v5.4, FreeRTOS, LVGL 8.x, esp-mqtt.
+SenseCAP Indicator firmware for ESP32-S3 + RP2040. ESP-IDF v5.4, FreeRTOS, LVGL 9 via ESP Component Manager, esp-mqtt.
 
 ---
 
@@ -8,66 +8,57 @@ SenseCAP Indicator firmware for ESP32-S3 + RP2040. ESP-IDF v5.4, FreeRTOS, LVGL 
 
 ```
 main/
-  main.c                  Entry point. Creates view_event_handle, calls model init then view init.
-  indicator_model.c       Model init orchestrator (feature-flag guarded includes).
-  indicator_view.c        View init orchestrator (feature-flag guarded includes).
+  main.c                  Entry point. Creates view_event_handle, then calls view init and model init.
+  indicator_model.c       Model init orchestrator for storage, button, display, RP2040, sensor, command, Wi-Fi, MQTT, and HA.
+  indicator_view.c        View init orchestrator. Creates nav tileview, then domain views/components.
   indicator_enabler.h     Aggregates all module headers; define-guards drive conditional init.
-  view_data.h             Shared event bus contract: all VIEW_EVENT_* definitions + event manifest.
-  lv_port.c               LVGL display/touch HAL. Owns lv_port_sem_take/give (LVGL thread safety).
+  view_data.h             Shared event bus contract and VIEW_EVENT_* definitions.
+  view_data_types.h       Pure data types used by the event contract.
+  lv_port.c               LVGL display/touch port. Owns lv_port_sem_take/give for LVGL thread safety.
 
-  app/                    Feature modules (MVC style — gradual migration to vertical slices).
-    indicator_wifi_*      WiFi scan, connect, status. Largest module (517L model, 626L view).
-    indicator_sensor_*    Sensor data from RP2040 via UART/COBS.
-    indicator_display_*   Display brightness, sleep mode.
-    indicator_mqtt.*      MQTT client lifecycle controller (broker-agnostic).
-    indicator_btn.*       Physical button handling.
-    indicator_cmd.*        Serial command interface.
-    indicator_storage_nvs.* NVS read/write helpers.
-    esp32_rp2040.*        UART/COBS communication with RP2040 co-processor.
+  nav/                    lv_tileview navigation for the main swipeable screens.
+  assets/                 LVGL 9 image/font descriptors used by handwritten screen components.
 
-  ha/                     Home Assistant domain — vertical slice architecture (pilot).
-    ha.h                  Public API for the entire HA domain.
-    ha_mqtt.c             MQTT client lifecycle for HA broker. Owns mqtt_ha_instance.
-    ha_config.c           Broker NVS config + IP display UI (owns ha_cfg_get/set).
-    ha_sensor.c           External HA sensor subscribe/publish.
-    ha_switch.c           Switch entity state, MQTT pub/sub, NVS persistence.
-    ha_switch_screen.c    LVGL widget component that builds the 8 switch widgets on nav tiles.
-    ha_switch_screen.h    Public interface: create / update / destroy.
-
-  ui/                     Squareline Studio generated code — being phased out.
-    ui.c / ui.h           Widget globals (lv_obj_t *ui_xxx) and screen init functions.
-    ui_events.c           LVGL event callbacks → post VIEW_EVENT_* to event bus.
-    ui_helpers.c          Screen transition helpers (lv_scr_load_anim wrappers).
-    screens/              Per-screen widget construction (generated, do not edit).
-    fonts/ images/        Asset arrays (safe to keep after Squareline removal).
+  ha/                     Home Assistant domain: broker config, MQTT lifecycle, sensors, switches, screen widgets.
+  wifi/                   Wi-Fi domain: scanning, connection state, list/connect modals, status icon.
+  sensor/                 Built-in sensor cache/parser and sensor data view.
+  display/                LCD backlight, sleep mode, and display settings view.
+  rp2040/                 UART/COBS ingress from the RP2040 co-processor.
+  btn/                    Physical button handling.
+  mqtt/                   Shared MQTT client lifecycle controller.
+  storage/                NVS helpers.
+  cmd/                    Serial command interface.
 
   util/
     cobs.*                COBS encode/decode for RP2040 UART framing.
-    indicator_util.*      IP address helpers (extract_ip_from_url, assemble_broker_url).
+    indicator_util.*      IP address helpers.
 ```
+
+New work should go into the owning vertical domain, not into legacy compatibility folders.
 
 ---
 
 ## Boot Sequence
 
 ```
-main()
-  1. esp_event_loop_create_default()         // System event loop (WiFi driver)
-  2. esp_event_loop_create(view_event_handle) // Main UI/data bus
-  3. indicator_model_init()
-       nvs_init → btn_init → display_init
-       → esp32_rp2040_init → sensor_init
-       → cmd_init
-       → wifi_model_init → mqtt_init → ha_model_init
+app_main()
+  1. bsp_board_init()
+  2. lv_port_init()
+  3. esp_event_loop_create(&view_event_handle)
   4. indicator_view_init()
-       ui_init()                              // LVGL screens created HERE
-       → sensor_view_init
-       → wifi_view_init
-       → ha_view_init                         // ha_switch_screen_create() called here
-  5. LVGL task loop (lv_port.c)
+       nav_init()
+       → indicator_display_view_init
+       → view_sensor_init
+       → indicator_wifi_view_init
+       → indicator_ha_view_init
+  5. indicator_model_init()
+       indicator_nvs_init → indicator_btn_init → indicator_display_init
+       → esp32_rp2040_init → indicator_sensor_init
+       → indicator_cmd_init
+       → indicator_wifi_model_init → indicator_mqtt_init → indicator_ha_model_init
 ```
 
-**Important**: `ha_model_init` runs before `ui_init`. Screen components (e.g. `ha_switch_screen_create`) must be called from the view init path, not model init.
+View initialization runs before model initialization in the current code. Screen components must tolerate initial empty state and update when model events arrive.
 
 ---
 
@@ -75,13 +66,13 @@ main()
 
 | Handle | Base | Created in | Purpose |
 |--------|------|------------|---------|
-| `view_event_handle` | `VIEW_EVENT_BASE` | `main.c` | Main UI/data bus — all cross-module data flow |
-| `mqtt_app_event_handle` | `MQTT_APP_EVENT_BASE` | `indicator_mqtt.c` | MQTT client lifecycle commands (start/stop/restart) |
+| `view_event_handle` | `VIEW_EVENT_BASE` | `main.c` | Main UI/data bus for cross-domain data flow |
+| `mqtt_app_event_handle` | `MQTT_APP_EVENT_BASE` | `mqtt/mqtt.c` | MQTT client lifecycle commands |
 | `ha_cfg_event_handle` | `HA_CFG_EVENT_BASE` | `ha/ha_mqtt.c` | HA broker config changes |
-| `cmd_cfg_event_handle` | `CMD_CFG_EVENT_BASE` | `indicator_cmd.c` | Serial command events |
-| *(default)* | `WIFI_EVENT`, `IP_EVENT` | `indicator_wifi_model.c` | ESP-IDF WiFi driver events |
+| `cmd_cfg_event_handle` | `CMD_CFG_EVENT_BASE` | `cmd/cmd.c` | Serial command events |
+| default event loop | `WIFI_EVENT`, `IP_EVENT` | `wifi/wifi_model.c` | ESP-IDF Wi-Fi driver events |
 
-**Full event manifest**: see comments in `view_data.h` — each `VIEW_EVENT_*` documents producer, consumer, payload, and LVGL lock requirement.
+The event manifest lives in `view_data.h` / `view_data_types.h`. When changing an event payload, update all listed producers and consumers together.
 
 ---
 
@@ -95,46 +86,63 @@ lv_port_sem_take();
 lv_port_sem_give();
 ```
 
-Files that currently hold this lock: `indicator_wifi_view.c`, `indicator_sensor_view.c`, `ha/ha_config.c`, `ha/ha_switch.c`, `ha/ha_switch_screen.c`, `indicator_view.c`.
+Allowed LVGL ownership is intentionally narrow:
 
-Rule: if your event handler calls any `lv_*` function, wrap it in the semaphore pair.
+| Area | LVGL access |
+|------|-------------|
+| `lv_port.[ch]` | Display/touch port and LVGL lock |
+| `nav/nav.[ch]` | Tileview/page-root containers |
+| `*_view.c` and `*_screen.c` files | Domain widgets and callbacks |
+| model/controller files | No LVGL object ownership |
 
 ---
 
-## Architectural Patterns
+## Architectural Pattern
 
-### Current (app/): MVC horizontal layers
-Model file posts events → View file consumes and updates widgets. Event bus is the only coupling.
+The branch uses vertical domain slices. Each domain owns its model, view, and supporting screen components behind a small public header:
 
-### Target (ha/): Vertical slices
-Each feature domain (config, sensor, switch) owns its full stack: data + MQTT + UI component.
-No cross-domain event hops for in-domain state changes.
+- `ha/ha.h`
+- `wifi/wifi.h`
+- `sensor/sensor.h`
+- `display/display.h`
+- `rp2040/rp2040.h`
+- `mqtt/mqtt.h`
+- `storage/storage_nvs.h`
+- `cmd/cmd.h`
+- `btn/btn.h`
 
-### Screen components (ha_switch_screen.c pattern)
-LVGL widget access is encapsulated in a `*_screen_t` struct:
-- `create()` — builds or wraps widget tree, called from view init after required parent screens/nav containers exist
-- `update(s, index, value)` — updates widget state, caller holds LVGL lock
-- `destroy(s)` — cleanup
+Domain-to-domain communication should go through `view_event_handle` or a documented domain API. Do not reintroduce a horizontal compatibility layer or generated-UI globals.
 
-New screen components should prefer direct widget creation plus explicit asset declarations over SquareLine globals.
+Screen components follow the local ownership pattern:
+
+- `create()` or `*_init()` builds widgets under a passed parent or a `nav_get_tile()` container.
+- `update()` applies state; callers must hold the LVGL lock unless the component documents that it locks internally.
+- `destroy()` is only needed for components with dynamic modal/widget lifetime.
 
 ---
 
 ## Agent Working Guidelines
 
-**Before modifying an event**: read the manifest comment in `view_data.h` to find all producers and consumers. A payload struct change affects every file listed there.
+Before modifying an event, read the manifest comment in `view_data.h` to find all producers and consumers.
 
-**Before modifying a module**: check its blast radius in this table:
+Before modifying a module, check its blast radius:
 
-| File | Blast radius |
-|------|-------------|
-| `view_data.h` | Entire codebase — touch with care |
-| `ha/ha.h` | All files in `ha/` |
-| `ui/ui_events.c` | Squareline callbacks; touches `ha_switch`, `wifi_model`, `wifi_view` |
-| `indicator_mqtt.h` | WiFi model, HA model, MQTT controller |
+| File/area | Blast radius |
+|-----------|-------------|
+| `view_data.h`, `view_data_types.h` | Cross-domain event contract |
+| `indicator_model.c`, `indicator_view.c` | Boot/init ordering |
+| `lv_port.c`, `components/bsp/` | Display/touch hardware behavior |
+| `nav/nav.c` | Main page container ownership |
+| `main/assets/` | Shared image/font descriptors |
 
-**Verifying changes**: run `python3 scripts/dev_check.py` — it runs `architecture_scan.py` then a full build. A passing build + scan is the minimum bar.
+Verifying changes:
 
-**Adding a new event**: add it to the enum in `view_data.h` with a full manifest comment (P/C/Payload/LVGL). Add it before `VIEW_EVENT_ALL`.
+```bash
+python3 scripts/dev_check.py --skip-build
+python3 scripts/test_ha_switch_protocol.py   # for HA/MQTT protocol changes
+./dev build                                  # full firmware build when needed
+```
 
-**Adding a new screen component**: follow `ha/ha_switch_screen.c` as the template. Prefer local widget ownership and `LV_IMG_DECLARE` / `LV_FONT_DECLARE` for generated assets instead of importing `ui.h`.
+Adding a new event: add it to `view_data.h` with a full manifest comment before `VIEW_EVENT_ALL`.
+
+Adding a new page: add a tile in `nav/nav.h`, include the owning directory in `main/CMakeLists.txt`, build widgets in that domain's view/screen file, and call the view init function from `indicator_view.c`.

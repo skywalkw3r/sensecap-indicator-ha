@@ -29,5 +29,5 @@ holding the LVGL port semaphore.
 
 ## UI Containment
 
-Only `sensor_view.c` may include `ui.h` or own LVGL label references. Model
-files must remain UI-free.
+Only `sensor_view.c` may own LVGL label references. Model files must remain
+UI-free.

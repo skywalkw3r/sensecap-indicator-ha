@@ -7,7 +7,7 @@ Scope: SenseCAP Indicator Home Assistant firmware, with emphasis on the ESP32S3 
 - ESP-IDF 5.4.x
 - ESP32-S3 owns display, touch, Wi-Fi, MQTT, Home Assistant control logic, command console, display settings, and UART ingress from RP2040.
 - RP2040 owns onboard/Grove sensor acquisition.
-- LVGL UI is currently generated from SquareLine under `main/ui/`.
+- LVGL 9 is managed by ESP Component Manager. The runtime UI is handwritten in domain view/screen components under `main/`, with reusable image/font assets under `main/assets/`.
 
 ## Starter Project Guidance
 
@@ -32,7 +32,7 @@ Start at `main/main.c`:
 4. `indicator_view_init()`
 5. `indicator_model_init()`
 
-View initialization starts SquareLine UI and view handlers. Model initialization starts storage, button, display, RP2040, sensor, command, Wi-Fi, MQTT, and Home Assistant logic.
+View initialization creates the nav tileview and domain view/screen components. Model initialization starts storage, button, display, RP2040, sensor, command, Wi-Fi, MQTT, and Home Assistant logic.
 
 ## Where To Look
 
@@ -41,22 +41,23 @@ View initialization starts SquareLine UI and view handlers. Model initialization
 | Boot order | `main/main.c` |
 | Runtime module wiring | `main/indicator_model.c`, `main/indicator_view.c` |
 | Shared event ids and payloads | `main/view_data.h` |
-| SquareLine UI objects | `main/ui/ui.h`, `main/ui/ui.c`, `main/ui/screens/` |
+| Navigation and page roots | `main/nav/nav.h`, `main/nav/nav.c` |
+| LVGL image/font assets | `main/assets/` |
 | LVGL port and locking | `main/lv_port.h`, `main/lv_port.c` |
-| Wi-Fi model/view | `main/app/indicator_wifi_model.c`, `main/app/indicator_wifi_view.c` |
-| MQTT controller | `main/app/indicator_mqtt.c`, `main/app/indicator_mqtt.h` |
-| Home Assistant model/view | `main/app/indicator_ha_model.c`, `main/app/indicator_ha_view.c` |
-| Display settings | `main/app/indicator_display_model.c`, `main/app/indicator_display_view.c` |
-| RP2040 UART ingress | `main/app/esp32_rp2040.c` |
-| Built-in sensor cache/parser | `main/app/indicator_sensor_model.c`, `main/app/indicator_sensor_view.c` |
+| Wi-Fi model/view | `main/wifi/` |
+| MQTT controller | `main/mqtt/mqtt.c`, `main/mqtt/mqtt.h` |
+| Home Assistant model/view | `main/ha/` |
+| Display settings | `main/display/` |
+| RP2040 UART ingress | `main/rp2040/rp2040.c`, `main/rp2040/rp2040.h` |
+| Built-in sensor cache/parser | `main/sensor/` |
 | Local development checks | `scripts/dev_check.py`, `scripts/architecture_scan.py` |
 
 ## Architecture Rules
 
 - Preserve current product behavior unless a task explicitly says otherwise.
 - ESP32S3 receives sensor data from RP2040. Do not add direct Grove drivers on ESP32S3.
-- SquareLine-generated UI files under `main/ui/` are generated assets. Avoid hand-editing generated files unless the task is specifically about the generated UI.
-- View files may include `ui.h` and call LVGL APIs.
+- Current runtime domains live in vertical slices such as `main/ha/`, `main/wifi/`, `main/sensor/`, `main/display/`, `main/rp2040/`, `main/mqtt/`, `main/storage/`, `main/cmd/`, and `main/btn/`; do not reintroduce legacy compatibility layers.
+- View/screen files may call LVGL APIs. Model files should remain UI-free.
 - Model files should not gain new LVGL object ownership.
 - Background tasks and event handlers must update LVGL through the documented LVGL lock/deferral pattern for the current code.
 - MQTT topics and Home Assistant payload compatibility are product behavior.

@@ -4,7 +4,7 @@
 #include "view_data.h"
 #include "esp_log.h"
 
-/* Re-declare only what this component needs — avoids pulling in ui.h. */
+/* Re-declare only what this component needs from the asset set. */
 LV_FONT_DECLARE(ui_font_font0);
 
 static const char *TAG = "wifi-connect-screen";

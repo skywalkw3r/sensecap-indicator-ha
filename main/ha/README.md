@@ -11,7 +11,7 @@ each feature slice owns its full stack (data model + MQTT protocol + UI componen
 |------|-------|------|
 | `ha.h` | 50 | Public API for the entire domain. Include this, not individual slice headers. |
 | `ha_mqtt.c` | ~200 | MQTT client lifecycle: connect/disconnect/reconnect. Routes `MQTT_EVENT_DATA` to sensor and switch slices. Owns `mqtt_ha_instance`. |
-| `ha_config.c` | ~154 | Broker NVS config (`ha_cfg_get`/`ha_cfg_set`) + IP address view (reads/writes `ui_textarea_ip_0`). |
+| `ha_config.c` | ~154 | Broker NVS config (`ha_cfg_get`/`ha_cfg_set`) + IP address modal view. |
 | `ha_sensor.c` | ~128 | Sensor entity metadata, subscribes to sensor MQTT topics, publishes built-in sensor readings, routes incoming sensor JSON to `VIEW_EVENT_HA_SENSOR`. |
 | `ha_switch.c` | ~237 | Switch entity metadata, NVS state persistence, MQTT publish/subscribe, posts `VIEW_EVENT_HA_SWITCH_SET`. Holds `ha_switch_screen_t *` — does NOT touch LVGL directly. |
 | `ha_switch_screen.c` | ~500 | Builds HA switch widgets on nav tiles. Owns widget handles for all 8 switch widgets. Dispatch table maps index → widget + updater function. |
@@ -22,18 +22,18 @@ each feature slice owns its full stack (data model + MQTT protocol + UI componen
 ## Init Sequence
 
 ```
-indicator_ha_model_init()   (called from indicator_model.c, before ui_init)
+indicator_ha_view_init()    (called from indicator_view.c)
+  ha_config_view_init()     register VIEW_EVENT_MQTT_ADDR_CHANGED + VIEW_EVENT_HA_ADDR_DISPLAY
+  ha_switch_screen_create() builds switch widgets on NAV_TILE_HA_CTRL and NAV_TILE_HA_MIX
+  ha_switch_attach_screen() gives ha_switch.c the screen handle
+
+indicator_ha_model_init()   (called later from indicator_model.c)
   ha_sensor_init()          register VIEW_EVENT_SENSOR_DATA handler
   ha_switch_init()          init entities, restore NVS state,
                             register VIEW_EVENT_HA_SWITCH_ST + VIEW_EVENT_HA_SWITCH_SET handlers
   create ha_cfg_event_handle
   init mqtt_ha_instance
   register VIEW_EVENT_WIFI_ST handler
-
-indicator_ha_view_init()    (called from indicator_view.c, after ui_init)
-  ha_config_view_init()     register VIEW_EVENT_MQTT_ADDR_CHANGED + VIEW_EVENT_HA_ADDR_DISPLAY
-  ha_switch_screen_create() builds switch widgets on NAV_TILE_HA_CTRL and NAV_TILE_HA_MIX
-  ha_switch_attach_screen() gives ha_switch.c the screen handle
 ```
 
 ---
@@ -55,7 +55,7 @@ MQTT broker sends switch command
 WiFi connects
   → VIEW_EVENT_WIFI_ST {is_network=true}
   → ha_mqtt.c: post MQTT_APP_START to mqtt_app_event_handle
-  → indicator_mqtt.c: calls mqtt_ha_instance.mqtt_starter()
+  → mqtt/mqtt.c: calls mqtt_ha_instance.mqtt_starter()
   → ha_mqtt.c: _mqtt_ha_start() reads NVS config, creates MQTT client
 
 MQTT connects
@@ -64,7 +64,7 @@ MQTT connects
   → ha_switch_subscribe() — subscribe to switch topics, start restore task
 
 User changes broker IP
-  → ui_events.c: posts VIEW_EVENT_MQTT_ADDR_CHANGED
+  → ha_config.c: posts VIEW_EVENT_MQTT_ADDR_CHANGED
   → ha_config.c: validates, saves NVS, posts HA_CFG_BROKER_CHANGED
   → ha_mqtt.c: stop/set_uri/start MQTT client
 ```

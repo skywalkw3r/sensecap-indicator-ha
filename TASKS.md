@@ -15,20 +15,19 @@
 - [x] Phase 3 — Display 域垂直切片（main/display/）
 - [x] Phase 3 — RP2040 域垂直切片（main/rp2040/）
 - [x] Phase 3 — btn/mqtt/storage/cmd 域垂直切片
-- [x] main/app/ 空 stub .c 文件全部删除（2026-05-27）
 - [x] Build 问题修复（shim guard 碰撞、missing wifi headers）
-- [x] 架构扫描工具 architecture_scan.py（持续验证无 ui.h 泄漏）
+- [x] 架构扫描工具 architecture_scan.py（持续验证域边界违规）
 
 ---
 
-- [x] main/app/ shim .h 全部删除，调用方直接 include 域头文件（2026-05-27）
+- [x] legacy shim/header cleanup：调用方直接 include 域头文件（2026-05-27）
 
 ---
 
 - [x] **Phase 4** — lv_tileview 导航重构（2026-05-28，build 通过）
   - nav 模块：3 tile 水平 tileview（ha_data / ha_ctrl / ha_mix）
   - wifi / display / broker → lv_layer_top() modal
-  - main/ui/ 完全删除，Squareline 依赖清零
+  - generated UI runtime 删除，SquareLine 依赖清零
   - 资源迁移至 main/assets/
 
 ---
@@ -55,7 +54,7 @@
 ## 架构原则（供 Agent 参考）
 
 1. **垂直切片**：每个域自包含，互不依赖实现细节
-2. **ui.h 隔离**：每个域只有 `*_view.c` 可以 `#include "ui.h"`
+2. **LVGL 边界**：只有 `lv_port`、`nav`、`*_view.c`、`*_screen.c` 拥有 LVGL 控件
 3. **事件总线**：域间通信只通过 `view_event_handle`（VIEW_EVENT_BASE）
 4. **architecture_scan.py**：每次改动后必须通过，CI 门槛
 5. **Agent 友好**：每个文件的职责单一，改动范围可预测
@@ -73,7 +72,7 @@ main/
   mqtt/     ← MQTT 总线域
   storage/  ← NVS 存储域
   cmd/      ← UART 控制台域
-  app/      ← 仅剩 shim .h（待清理）+ AGENTS.md
-  ui/       ← Squareline 导出（只读，不改）
+  nav/      ← lv_tileview 导航域
+  assets/   ← LVGL 9 图像/字体资源
   util/     ← 工具函数
 ```

@@ -27,7 +27,6 @@ main/
   nav/          lv_tileview 导航（主屏滑动）
   assets/       图像和字体资源（LVGL 9 格式）
   util/         公共工具函数
-  app/          ⚠️ 仅含 AGENTS.md，不在此新建文件
 
   main.c              入口
   indicator_model.c   全局模型初始化（各域 model_init 汇总）
@@ -182,15 +181,15 @@ esp_event_handler_instance_register_with(
 
 ### assets/ 图像格式（LVGL 9）
 
-数据为 RGB565 + Alpha 交错，3 字节/像素。新增图像描述符格式：
+数据为 RGB565 色彩平面 + A8 alpha 平面，合计 3 字节/像素。LVGL 9 描述符格式：
 ```c
 const lv_image_dsc_t ui_img_xxx = {
     .header.magic  = LV_IMAGE_HEADER_MAGIC,
-    .header.cf     = LV_COLOR_FORMAT_NATIVE_WITH_ALPHA,
+    .header.cf     = LV_COLOR_FORMAT_RGB565A8,
     .header.flags  = 0,
     .header.w      = W,
     .header.h      = H,
-    .header.stride = W * 3,        // 3 bytes/pixel（RGB565 + A 交错）
+    .header.stride = W * 2,        // RGB565 plane stride; alpha plane follows data
     .data_size     = sizeof(ui_img_xxx_data),
     .data          = ui_img_xxx_data,
 };
@@ -211,12 +210,11 @@ const lv_image_dsc_t ui_img_xxx = {
 ## 验证清单（每次改动后按顺序执行）
 
 ```bash
-# 1. 架构扫描（检查 ui.h 泄漏、域边界违规）
+# 1. 架构扫描（检查域边界违规）
 python3 scripts/architecture_scan.py
 
 # 2. 构建（必须 0 error）
-source ~/esp/v5.4.3/esp-idf/export.sh
-idf.py build
+./dev build
 
 # 3. HA/MQTT 协议改动时额外运行
 python3 scripts/test_ha_switch_protocol.py
@@ -231,6 +229,6 @@ python3 scripts/test_ha_switch_protocol.py
 | `lvgl/lvgl.h: No such file` | 旧 LVGL 8 路径 | 改为 `#include "lvgl.h"` |
 | `lv_event_send` 类型不匹配 | LVGL 8 API | 改为 `lv_obj_send_event(obj, event, NULL)` |
 | `always_zero` 无此成员 | 旧图像描述符格式 | 用上方 assets 格式重写 |
-| `LV_IMG_CF_TRUE_COLOR_ALPHA` 未声明 | LVGL 8 常量 | 改为 `LV_COLOR_FORMAT_NATIVE_WITH_ALPHA` |
+| `LV_IMG_CF_TRUE_COLOR_ALPHA` 未声明 | LVGL 8 常量 | 改为 `LV_COLOR_FORMAT_RGB565A8` 并设置 `header.stride` |
 | tile 页面空白 | `NAV_TILE_COUNT` 未更新 | nav.h 中 COUNT 同步 +1 |
 | LVGL assert / crash | 未持锁访问 LVGL | 加 `lv_port_sem_take/give` |

@@ -4,28 +4,26 @@ Vertical slice for all WiFi functionality. Mirrors the pattern established by `m
 
 ## File Responsibilities
 
-| File | Owns | `ui.h` |
+| File | Owns | LVGL |
 |---|---|---|
 | `wifi_model.c` | ESP WiFi event handling, state machine, ping network check, 5-min reconnect task | ✗ |
-| `wifi_list_screen.c` | AP list widget lifecycle, item creation, show/hide spinner | ✗ |
-| `wifi_connect_screen.c` | Connect dialog and AP-details dialog (modal overlays) | ✗ |
-| `wifi_view.c` | Event subscriptions, status icon updates, screen navigation, component coordination | **✓ only here** |
+| `wifi_list_screen.c` | AP list widget lifecycle, item creation, show/hide spinner | ✓ |
+| `wifi_connect_screen.c` | Connect dialog and AP-details dialog (modal overlays) | ✓ |
+| `wifi_view.c` | Event subscriptions, status icon updates, screen navigation, component coordination | ✓ |
 | `wifi.h` | Umbrella header (`wifi_model.h` + `wifi_view.h`) | — |
 
 ## Init Sequence
 
 ```
-indicator_wifi_model_init()   ← called from indicator_model_init(), before ui_init()
+indicator_wifi_view_init()    ← called from indicator_view_init()
+  → creates Wi-Fi status/list/connect widgets on nav/modal parents
+  → registers VIEW_EVENT handlers for WIFI_ST / WIFI_LIST / SCREEN_START / CONNECT_RET / etc.
+
+indicator_wifi_model_init()   ← called later from indicator_model_init()
   → ESP netif + WiFi stack init
   → starts _indicator_wifi_task (ping / reconnect loop)
   → registers VIEW_EVENT handlers for WIFI_LIST_REQ / WIFI_CONNECT / CFG_DELETE / SHUTDOWN
   → posts VIEW_EVENT_SCREEN_START if no saved SSID
-
-ui_init()                     ← creates all Squareline widgets
-
-indicator_wifi_view_init()    ← called from indicator_view_init(), after ui_init()
-  → wifi_list_screen_create(ui_screen_wifi, ui_wifi_scan_wait)
-  → registers VIEW_EVENT handlers for WIFI_ST / WIFI_LIST / SCREEN_START / CONNECT_RET / etc.
 ```
 
 ## Event Flow
@@ -62,9 +60,9 @@ All LVGL widget mutations in `wifi_view.c` event handlers are wrapped with
 Screen component functions (`wifi_list_screen_*`, `wifi_connect_screen_*`)
 are always called from within an already-held semaphore in `wifi_view.c`.
 
-## ui.h Containment Rule
+## LVGL Containment Rule
 
-Only `wifi_view.c` may include `ui.h` within this domain. Screen component
-files use `LV_IMG_DECLARE` / `LV_FONT_DECLARE` for the specific assets they
-need, and accept parent widget pointers as parameters rather than referencing
-Squareline globals directly.
+Only view/screen files in this domain may own LVGL widgets. `wifi_model.c`
+must remain UI-free. Screen component files use `LV_IMAGE_DECLARE` /
+`LV_FONT_DECLARE` for the specific assets they need and accept parent widget
+pointers as parameters.

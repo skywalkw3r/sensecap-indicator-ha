@@ -4,7 +4,7 @@
 #include "indicator_util.h"
 
 /* Re-declare only the image assets this component needs — avoids pulling
- * in the full ui.h / Squareline namespace. */
+ * in the old generated-UI namespace. */
 LV_IMAGE_DECLARE(ui_img_wifi_1_png);
 LV_IMAGE_DECLARE(ui_img_wifi_2_png);
 LV_IMAGE_DECLARE(ui_img_wifi_3_png);
