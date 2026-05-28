@@ -51,6 +51,16 @@ class LcdRgbConfigTests(unittest.TestCase):
 
         self.assertIn("CONFIG_LV_DEF_REFR_PERIOD=10", text)
 
+    def test_rgb_panel_uses_bounce_buffer_for_psram_scanout(self) -> None:
+        text = BSP_LCD.read_text()
+
+        self.assertIn(".bounce_buffer_size_px = brd->LCD_WIDTH * 10", text)
+
+    def test_lvgl_port_uses_bounce_buffer_completion_callback(self) -> None:
+        text = LV_PORT.read_text()
+
+        self.assertIn(".bb_mode = true", text)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -148,7 +148,7 @@ static void lv_port_disp_init(void)
     if (LCD_IFACE_RGB == brd->LCD_IFACE) {
         const lvgl_port_display_rgb_cfg_t rgb_cfg = {
             .flags = {
-                .bb_mode = false,
+                .bb_mode = true,
 #if CONFIG_LCD_AVOID_TEAR
                 .avoid_tearing = true,
 #else

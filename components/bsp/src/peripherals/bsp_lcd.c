@@ -196,6 +196,7 @@ esp_err_t bsp_lcd_init(void)
                 .vsync_pulse_width = brd->VSYNC_PULSE_WIDTH,
                 .flags.pclk_active_neg = brd->PCLK_ACTIVE_NEG,
             },
+            .bounce_buffer_size_px = brd->LCD_WIDTH * 10,
             .flags.fb_in_psram = 1,
 #if CONFIG_LCD_AVOID_TEAR
             .flags.double_fb = 1,
