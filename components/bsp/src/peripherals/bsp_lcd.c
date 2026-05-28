@@ -14,9 +14,6 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
-#include "freertos/task.h"
 #include "rom/cache.h"
 #include "soc/soc_memory_layout.h"
 #include "lcd_panel_st7796.h"
@@ -28,13 +25,9 @@ static const char *TAG = "bsp_lcd";
 static esp_lcd_panel_io_handle_t io_handle = NULL;
 static esp_lcd_panel_handle_t panel_handle = NULL;
 
-#if CONFIG_LCD_AVOID_TEAR
+#if CONFIG_LCD_LVGL_FULL_REFRESH || CONFIG_LCD_LVGL_DIRECT_MODE
 static uint8_t *lcd_buf0 = NULL;
 static uint8_t *lcd_buf1 = NULL;
-static SemaphoreHandle_t trans_ready = NULL;
-static SemaphoreHandle_t flush_ready = NULL;
-static TaskHandle_t lcd_task_handle;
-static void lcd_task(void *args);
 #endif
 
 #if CONFIG_LCD_LVGL_DIRECT_MODE
@@ -77,39 +70,6 @@ static esp_err_t screen_clear(uint16_t color)
     free(buffer);
     return ESP_OK;
 }
-
-IRAM_ATTR static bool on_vsync_event(
-    esp_lcd_panel_handle_t panel,
-    const esp_lcd_rgb_panel_event_data_t *edata,
-    void *user_ctx
-)
-{
-    (void) panel;
-    (void) edata;
-    (void) user_ctx;
-
-    BaseType_t high_task_awoken = pdFALSE;
-#if CONFIG_LCD_AVOID_TEAR
-    xSemaphoreGiveFromISR(trans_ready, &high_task_awoken);
-    xSemaphoreGiveFromISR(flush_ready, &high_task_awoken);
-#endif
-
-    return high_task_awoken == pdTRUE;
-}
-
-#if CONFIG_LCD_AVOID_TEAR
-static void lcd_task(void *args)
-{
-    TickType_t tick;
-    for (;;) {
-        tick = xTaskGetTickCount();
-        xSemaphoreTake(trans_ready, portMAX_DELAY);
-        vTaskDelayUntil(&tick, pdMS_TO_TICKS(CONFIG_LCD_TASK_REFRESH_TIME));
-        esp_lcd_rgb_panel_refresh(panel_handle);
-        xSemaphoreTake(flush_ready, 0);
-    }
-}
-#endif
 
 esp_err_t bsp_lcd_init(void)
 {
@@ -239,14 +199,9 @@ esp_err_t bsp_lcd_init(void)
             .flags.fb_in_psram = 1,
 #if CONFIG_LCD_AVOID_TEAR
             .flags.double_fb = 1,
-            .flags.refresh_on_demand = 1,   // Mannually control refresh operation
 #endif
         };
         esp_lcd_new_rgb_panel(&panel_config, &panel_handle);
-        esp_lcd_rgb_panel_event_callbacks_t cbs = {
-            .on_vsync = on_vsync_event,
-        };
-        esp_lcd_rgb_panel_register_event_callbacks(panel_handle, &cbs, NULL);
     }
 #endif
     if (LCD_IFACE_RGB != brd->LCD_IFACE) {
@@ -274,14 +229,10 @@ esp_err_t bsp_lcd_init(void)
     esp_lcd_panel_disp_off(panel_handle, false);
 #endif
 
-#if CONFIG_LCD_AVOID_TEAR
+#if CONFIG_LCD_LVGL_FULL_REFRESH || CONFIG_LCD_LVGL_DIRECT_MODE
+    if (LCD_IFACE_RGB == brd->LCD_IFACE) {
         esp_lcd_rgb_panel_get_frame_buffer(panel_handle, 2, (void **)&lcd_buf0, (void **)&lcd_buf1);
-        trans_ready = xSemaphoreCreateBinary();
-        assert(trans_ready);
-        xSemaphoreGive(trans_ready);
-        flush_ready = xSemaphoreCreateBinary();
-        assert(flush_ready);
-        xTaskCreate(lcd_task, "lcd_task", 2048, NULL, CONFIG_LCD_TASK_PRIORITY, &lcd_task_handle);
+    }
 #endif
 
     // Configure LCD backlight IO.
@@ -316,20 +267,15 @@ esp_err_t bsp_lcd_deinit(void)
 
 esp_err_t bsp_lcd_flush(int x1, int y1, int x2, int y2, const void *p_data)
 {
-#if !CONFIG_LCD_LVGL_DIRECT_MODE
-    esp_lcd_panel_draw_bitmap(panel_handle, x1, y1, x2, y2, p_data);
-#endif
-
 #if CONFIG_LCD_LVGL_DIRECT_MODE
-    if (lvgl_flush_is_end()) {
+    if (!lvgl_flush_is_end || lvgl_flush_is_end()) {
         esp_lcd_panel_draw_bitmap(panel_handle, x1, y1, x2, y2, p_data);
-        xSemaphoreTake(flush_ready, portMAX_DELAY);
         if (lvgl_direct_mode_buf_copy) {
             lvgl_direct_mode_buf_copy();
         }
     }
-#elif CONFIG_LCD_LVGL_FULL_REFRESH
-    xSemaphoreTake(flush_ready, portMAX_DELAY);
+#else
+    esp_lcd_panel_draw_bitmap(panel_handle, x1, y1, x2, y2, p_data);
 #endif
 
     const board_res_desc_t *brd = bsp_board_get_description();

@@ -13,7 +13,7 @@
 #define LV_PORT_BUFFER_HEIGHT        (brd->LCD_HEIGHT)
 #define LV_PORT_TASK_DELAY_MS        (5)
 #define LV_PORT_TASK_MAX_SLEEP_MS    (500)
-#define LV_PORT_TASK_STACK_SIZE      (4096)
+#define LV_PORT_TASK_STACK_SIZE      (8192)
 
 static const char *TAG = "lvgl_port";
 static lv_display_t *s_display = NULL;
