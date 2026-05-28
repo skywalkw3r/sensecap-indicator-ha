@@ -15,6 +15,7 @@ required tool is missing.
 Usage (via the repo-root launcher):
     ./dev build                (Windows:  dev build)       # ESP32-S3
     ./dev build --no-clean
+    ./dev fullclean
     ./dev flash -p /dev/ttyACM0
     ./dev monitor
 
@@ -34,6 +35,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = ROOT / "build"
 RP2040_DIR = ROOT / "rp2040"
+PYTHON_ENV_MISMATCH_MARKERS = (
+    "is currently active in the environment while the project was configured with",
+    "Run 'idf.py fullclean' to start again",
+)
 
 
 # --- environment guards (per target) ----------------------------------------
@@ -74,6 +79,17 @@ def run_idf(idf_args: list[str]) -> int:
     return subprocess.run(cmd, cwd=ROOT).returncode
 
 
+def run_idf_capture(idf_args: list[str]) -> subprocess.CompletedProcess[str]:
+    cmd = ["idf.py", *idf_args]
+    print("$ " + " ".join(cmd), flush=True)
+    result = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    return result
+
+
 def run_pio(pio_args: list[str]) -> int:
     cmd = ["pio", *pio_args]
     print("$ " + " ".join(cmd) + "   # (in rp2040/)", flush=True)
@@ -91,12 +107,39 @@ def cmd_build(args: argparse.Namespace) -> int:
     return run_idf(["build"])
 
 
+def cmd_fullclean(args: argparse.Namespace) -> int:
+    del args
+    return run_idf(["fullclean"])
+
+
+def is_idf_python_env_mismatch(output: str) -> bool:
+    return all(marker in output for marker in PYTHON_ENV_MISMATCH_MARKERS)
+
+
 def cmd_flash(args: argparse.Namespace) -> int:
     idf_args: list[str] = []
     if args.port:
         idf_args += ["-p", args.port]
     idf_args += ["-b", str(args.baud)]
-    return run_idf([*idf_args, "flash"])
+    flash_args = [*idf_args, "flash"]
+    result = run_idf_capture(flash_args)
+    if result.returncode == 0:
+        return 0
+
+    output = f"{result.stdout or ''}{result.stderr or ''}"
+    if not is_idf_python_env_mismatch(output):
+        return result.returncode
+
+    print(
+        "! ESP-IDF Python environment changed; running `idf.py fullclean` "
+        "and retrying flash once.",
+        file=sys.stderr,
+        flush=True,
+    )
+    clean_result = run_idf_capture(["fullclean"])
+    if clean_result.returncode != 0:
+        return clean_result.returncode
+    return run_idf(flash_args)
 
 
 def cmd_monitor(args: argparse.Namespace) -> int:
@@ -143,6 +186,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="incremental build; skip wiping build/ first",
     )
     p_build.set_defaults(func=cmd_build, ensure=ensure_idf)
+
+    p_fullclean = sub.add_parser("fullclean", help="[S3] run idf.py fullclean")
+    p_fullclean.set_defaults(func=cmd_fullclean, ensure=ensure_idf)
 
     p_flash = sub.add_parser("flash", help="[S3] flash the firmware")
     p_flash.add_argument(
