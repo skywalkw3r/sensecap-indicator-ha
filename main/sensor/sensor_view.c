@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "esp_log.h"
 #include <string.h>
 
 #include "sensor_model.h"
@@ -13,10 +14,10 @@
 #define SENSOR_CARD_WIDTH  214
 #define SENSOR_CARD_HEIGHT 164
 
-LV_IMG_DECLARE(ui_img_ic_temp_png);
-LV_IMG_DECLARE(ui_img_ic_hum_png);
-LV_IMG_DECLARE(ui_img_ic_tvoc_png);
-LV_IMG_DECLARE(ui_img_ic_co2_png);
+LV_IMAGE_DECLARE(ui_img_ic_temp_png);
+LV_IMAGE_DECLARE(ui_img_ic_hum_png);
+LV_IMAGE_DECLARE(ui_img_ic_tvoc_png);
+LV_IMAGE_DECLARE(ui_img_ic_co2_png);
 LV_FONT_DECLARE(ui_font_font0);
 
 static const char* TAG = "sensor_view";
@@ -38,12 +39,12 @@ static void format_sensor_data(char* buf, enum sensor_data_type sensor_type, con
 typedef struct SensorCardSpec
 {
 	enum sensor_data_type type;
-	const lv_img_dsc_t* icon;
+	const lv_image_dsc_t* icon;
 	const char* name;
 	const char* unit;
 	uint32_t accent_color;
-	lv_coord_t x;
-	lv_coord_t y;
+	int32_t x;
+	int32_t y;
 	lv_obj_t* labels[1];
 } SensorCardSpec;
 
@@ -90,7 +91,7 @@ static void sensor_view_create_header(lv_obj_t* tile) {
 	lv_obj_t* header = lv_obj_create(tile);
 	lv_obj_set_size(header, 480, 85);
 	lv_obj_set_pos(header, 0, 0);
-	lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
 	lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_border_width(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_pad_all(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -110,17 +111,17 @@ static void sensor_view_create_card(lv_obj_t* tile, SensorCardSpec* spec) {
 	lv_obj_t* card = lv_obj_create(tile);
 	lv_obj_set_size(card, SENSOR_CARD_WIDTH, SENSOR_CARD_HEIGHT);
 	lv_obj_set_pos(card, spec->x, spec->y);
-	lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 	lv_obj_set_style_radius(card, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_bg_color(card, lv_color_hex(0x282828), LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_bg_opa(card, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_border_width(card, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 	lv_obj_set_style_pad_all(card, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-	lv_obj_t* icon = lv_img_create(card);
-	lv_img_set_src(icon, spec->icon);
+	lv_obj_t* icon = lv_image_create(card);
+	lv_image_set_src(icon, spec->icon);
 	lv_obj_set_pos(icon, 69, 22);
-	lv_obj_clear_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
 
 	lv_obj_t* data = lv_label_create(card);
 	lv_obj_set_width(data, 100);

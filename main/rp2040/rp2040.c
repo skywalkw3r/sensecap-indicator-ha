@@ -7,6 +7,7 @@
  * @copyright © 2023, Seeed Studio
  */
 #include "rp2040.h"
+#include "esp_log.h"
 #include "cobs.h"
 #include "driver/uart.h"
 #include "view_data.h"

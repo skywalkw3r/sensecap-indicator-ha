@@ -1,4 +1,5 @@
 #include "wifi_view.h"
+#include "esp_log.h"
 #include "wifi_list_screen.h"
 #include "wifi_connect_screen.h"
 #include "view_data.h"
@@ -6,10 +7,10 @@
 #include "indicator_util.h"
 #include "nav.h"
 
-LV_IMG_DECLARE(ui_img_wifi_1_png);
-LV_IMG_DECLARE(ui_img_wifi_2_png);
-LV_IMG_DECLARE(ui_img_wifi_3_png);
-LV_IMG_DECLARE(ui_img_wifi_disconet_png);
+LV_IMAGE_DECLARE(ui_img_wifi_1_png);
+LV_IMAGE_DECLARE(ui_img_wifi_2_png);
+LV_IMAGE_DECLARE(ui_img_wifi_3_png);
+LV_IMAGE_DECLARE(ui_img_wifi_disconet_png);
 
 static const char *TAG = "wifi-view";
 
@@ -49,7 +50,7 @@ static void _ensure_wifi_modal(void) {
     s_wifi_modal = lv_obj_create(lv_layer_top());
     lv_obj_set_size(s_wifi_modal, 480, 800);
     lv_obj_set_align(s_wifi_modal, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(s_wifi_modal, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(s_wifi_modal, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(s_wifi_modal, lv_color_hex(0x101418),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(s_wifi_modal, LV_OPA_COVER,
@@ -59,13 +60,13 @@ static void _ensure_wifi_modal(void) {
     lv_obj_t *header = lv_obj_create(s_wifi_modal);
     lv_obj_set_size(header, 480, 85);
     lv_obj_set_align(header, LV_ALIGN_TOP_MID);
-    lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP,
                             LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_opa(header, LV_OPA_TRANSP,
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_t *back = lv_btn_create(header);
+    lv_obj_t *back = lv_button_create(header);
     lv_obj_set_size(back, 100, 50);
     lv_obj_set_pos(back, 10, 17);
     lv_obj_set_style_bg_color(back, lv_color_hex(0x292831),
@@ -81,10 +82,11 @@ static void _ensure_wifi_modal(void) {
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_align(title, LV_ALIGN_BOTTOM_MID);
 
-    s_wifi_spinner = lv_spinner_create(s_wifi_modal, 1000, 90);
+    s_wifi_spinner = lv_spinner_create(s_wifi_modal);
+    lv_spinner_set_anim_params(s_wifi_spinner, 1000, 90);
     lv_obj_set_size(s_wifi_spinner, 50, 50);
     lv_obj_set_align(s_wifi_spinner, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(s_wifi_spinner, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(s_wifi_spinner, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(s_wifi_spinner, LV_OBJ_FLAG_HIDDEN);
 
     s_list_screen = wifi_list_screen_create(s_wifi_modal, s_wifi_spinner);
@@ -95,7 +97,7 @@ static void _show_wifi_modal(void) {
     _ensure_wifi_modal();
     if(!s_wifi_modal) return;
 
-    lv_obj_clear_flag(s_wifi_modal, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(s_wifi_modal, LV_OBJ_FLAG_HIDDEN);
     wifi_list_screen_show_spinner(s_list_screen);
 
     esp_event_post_to(view_event_handle, VIEW_EVENT_BASE,
@@ -113,32 +115,32 @@ static void _ensure_wifi_status_icon(void) {
     lv_obj_t *tile = nav_get_tile(NAV_TILE_HA_DATA);
     if(!tile) return;
 
-    lv_obj_t *button = lv_btn_create(tile);
+    lv_obj_t *button = lv_button_create(tile);
     lv_obj_set_size(button, 60, 60);
     lv_obj_set_align(button, LV_ALIGN_TOP_RIGHT);
     lv_obj_set_pos(button, -10, 10);
-    lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(button, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(button, lv_color_hex(0x101418),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(button, LV_OPA_COVER,
                             LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(button, _on_wifi_icon_clicked, LV_EVENT_CLICKED, NULL);
 
-    s_wifi_icon = lv_img_create(button);
-    lv_img_set_src(s_wifi_icon, &ui_img_wifi_disconet_png);
+    s_wifi_icon = lv_image_create(button);
+    lv_image_set_src(s_wifi_icon, &ui_img_wifi_disconet_png);
     lv_obj_center(s_wifi_icon);
     lv_obj_add_flag(s_wifi_icon, LV_OBJ_FLAG_ADV_HITTEST);
-    lv_obj_clear_flag(s_wifi_icon, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(s_wifi_icon, LV_OBJ_FLAG_SCROLLABLE);
 }
 
 /* ── list item tap callbacks (live here to access module state) ───────── */
 
 static void _on_unconnected_tap(lv_event_t *e) {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    if(lv_indev_get_type(lv_indev_get_act()) != LV_INDEV_TYPE_POINTER) return;
+    if(lv_indev_get_type(lv_indev_active()) != LV_INDEV_TYPE_POINTER) return;
     if(s_connect_screen != NULL) return; /* dialog already open */
 
-    lv_obj_t *btn = lv_event_get_target(e);
+    lv_obj_t *btn = lv_event_get_target_obj(e);
     const char *ssid = wifi_list_screen_get_item_ssid(s_list_screen, btn);
     bool have_password = (lv_obj_get_child_cnt(btn) > 2);
     s_connect_screen = wifi_connect_screen_show(ssid, have_password);
@@ -146,10 +148,10 @@ static void _on_unconnected_tap(lv_event_t *e) {
 
 static void _on_connected_tap(lv_event_t *e) {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    if(lv_indev_get_type(lv_indev_get_act()) != LV_INDEV_TYPE_POINTER) return;
+    if(lv_indev_get_type(lv_indev_active()) != LV_INDEV_TYPE_POINTER) return;
     if(s_connect_screen != NULL) return;
 
-    lv_obj_t *btn = lv_event_get_target(e);
+    lv_obj_t *btn = lv_event_get_target_obj(e);
     const char *ssid = wifi_list_screen_get_item_ssid(s_list_screen, btn);
     s_connect_screen = wifi_details_screen_show(ssid);
 }
@@ -160,9 +162,9 @@ static lv_obj_t *s_result_toast = NULL;
 
 static void _toast_close_cb(lv_timer_t *timer) {
     if(s_result_toast) {
-        lv_obj_del(s_result_toast);
+        lv_obj_delete(s_result_toast);
         s_result_toast = NULL;
-        lv_obj_clear_flag(lv_layer_top(), LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(lv_layer_top(), LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_style_bg_opa(lv_layer_top(), LV_OPA_TRANSP, 0);
     }
 }
@@ -171,7 +173,7 @@ static void _show_connect_result(struct view_data_wifi_connet_ret_msg *p_msg) {
     s_result_toast = lv_obj_create(lv_layer_top());
     lv_obj_set_size(s_result_toast, 300, 150);
     lv_obj_set_align(s_result_toast, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(s_result_toast, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(s_result_toast, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(s_result_toast, lv_palette_main(LV_PALETTE_GREY), 0);
 
     lv_obj_t *msg = lv_label_create(s_result_toast);
@@ -213,7 +215,7 @@ static void _view_event_handler(void *handler_args, esp_event_base_t base,
             lv_port_sem_take();
             _ensure_wifi_status_icon();
             if(s_wifi_icon) {
-                lv_img_set_src(s_wifi_icon, src);
+                lv_image_set_src(s_wifi_icon, src);
             }
             lv_port_sem_give();
             break;

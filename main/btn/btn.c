@@ -1,5 +1,7 @@
 #include "btn.h"
+#include "bsp_board.h"
 #include "bsp_btn.h"
+#include "esp_log.h"
 #include "esp_timer.h"
 #include <nvs.h>
 #include <nvs_flash.h>

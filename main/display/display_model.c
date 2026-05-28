@@ -1,4 +1,5 @@
 #include "display_model.h"
+#include "esp_log.h"
 #include "storage_nvs.h"
 
 #include "freertos/semphr.h"

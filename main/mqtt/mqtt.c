@@ -1,4 +1,5 @@
 #include "mqtt.h"
+#include "esp_log.h"
 #include "esp_wifi.h"
 
 static const char *TAG = "INDICATOR_MQTT";
