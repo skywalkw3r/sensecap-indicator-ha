@@ -268,6 +268,13 @@ static void _create_sensor_card(lv_obj_t *tile, const sensor_card_spec_t *spec)
     lv_obj_add_flag(icon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
 
+    /*
+     * This "N/A" label is the display slot for HA-pushed sensor values
+     * (VIEW_EVENT_HA_SENSOR). Its handle is currently discarded, so the card
+     * stays "N/A". To make it live, store `data` keyed by card index and have a
+     * VIEW_EVENT_HA_SENSOR handler call lv_label_set_text on it. See the wiring
+     * note in ha_sensor.c (ha_sensor_on_mqtt_data).
+     */
     lv_obj_t *data = lv_label_create(card);
     lv_obj_set_size(data, 100, LV_SIZE_CONTENT);
     lv_obj_set_pos(data, spec->data_x, spec->data_y);

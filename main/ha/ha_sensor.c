@@ -117,6 +117,22 @@ int ha_sensor_on_mqtt_data(const char *topic, int topic_len, const char *data, i
                 strncpy(sensor_data.value, cjson_item->valuestring, sizeof(sensor_data.value) - 1);
 
                 ESP_LOGI(TAG, "MQTT message: sensor %s is %s", ha_sensor_entities[i].key, sensor_data.value);
+                /*
+                 * NOTE: VIEW_EVENT_HA_SENSOR currently has NO consumer, so this
+                 * value is parsed and posted but never shown. Wiring it up turns
+                 * the Indicator into a generic HA dashboard: display ANY entity
+                 * pushed from Home Assistant over MQTT, with no physical sensor
+                 * attached to the device (the use case in issue #5).
+                 *
+                 * To wire it up:
+                 *   1. ha_switch_screen.c::_create_sensor_card already builds the
+                 *      "N/A" data labels on NAV_TILE_HA_MIX but discards the handle.
+                 *      Store each label keyed by card index (cf. the switch_slot_t
+                 *      pattern).
+                 *   2. Register a VIEW_EVENT_HA_SENSOR handler that, under the LVGL
+                 *      lock, does lv_label_set_text(labels[data->index], data->value).
+                 *   3. Make sensor_data.index here map to the intended card slot.
+                 */
                 esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, &sensor_data, sizeof(sensor_data), portMAX_DELAY);
                 cJSON_Delete(root);
                 return 0;
