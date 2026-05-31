@@ -116,7 +116,7 @@ wifi_connect_screen_t *wifi_connect_screen_show(const char *ssid, bool have_pass
     strncpy(s->ssid, ssid, sizeof(s->ssid));
 
     lv_obj_add_flag(lv_layer_top(), LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_bg_opa(lv_layer_top(), LV_OPA_50, 0);
+    lv_obj_set_style_bg_opa(lv_layer_top(), LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(lv_layer_top(), lv_palette_main(LV_PALETTE_GREY), 0);
 
     s->container = lv_obj_create(lv_layer_top());
@@ -192,7 +192,7 @@ wifi_connect_screen_t *wifi_details_screen_show(const char *ssid) {
     strncpy(s->ssid, ssid, sizeof(s->ssid));
 
     lv_obj_add_flag(lv_layer_top(), LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_bg_opa(lv_layer_top(), LV_OPA_50, 0);
+    lv_obj_set_style_bg_opa(lv_layer_top(), LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(lv_layer_top(), lv_palette_main(LV_PALETTE_GREY), 0);
 
     s->container = lv_obj_create(lv_layer_top());
