@@ -221,35 +221,46 @@ struct {
  * here is race-free. select() bounds each line wait so a forgotten paste
  * cannot wedge the console forever. */
 static int read_pem_from_console(char *buf, size_t buf_size) {
+    static const char END_MARKER[] = "-----END CERTIFICATE-----";
     size_t used = 0;
-    printf("Paste the CA certificate PEM now (ends with -----END CERTIFICATE-----).\n");
-    printf("Max %u bytes, 30 s per-line timeout, Ctrl-C style abort: just wait it out.\n",
-           (unsigned)(buf_size - 1));
+    int fd = fileno(stdin);
 
+    printf("Paste the CA certificate PEM now (must contain %s).\n", END_MARKER);
+    printf("Max %u bytes; aborts after 30 s with no input.\n", (unsigned)(buf_size - 1));
+
+    /* Read the raw fd rather than fgets() so select() and the byte stream stay
+     * in sync: stdio buffering could pull the whole PEM (marker included) into
+     * fgets()'s buffer, leaving select() to time out on an empty fd even though
+     * the cert is complete; a final line without a newline could likewise block
+     * fgets() past the timeout. Scanning the entire accumulated buffer for the
+     * END marker also detects it with no trailing newline and even when a read()
+     * splits it across chunks. */
     while (used < buf_size - 1) {
         fd_set rfds;
         FD_ZERO(&rfds);
-        FD_SET(fileno(stdin), &rfds);
+        FD_SET(fd, &rfds);
         struct timeval tv = { .tv_sec = 30, .tv_usec = 0 };
-        int sel = select(fileno(stdin) + 1, &rfds, NULL, NULL, &tv);
-        if (sel <= 0) {
+        int sel = select(fd + 1, &rfds, NULL, NULL, &tv);
+        if (sel < 0) {
+            printf("setmqttca: console read error\n");
+            return -1;
+        }
+        if (sel == 0) {
             printf("setmqttca: timed out waiting for certificate data\n");
             return -1;
         }
-        char line[128];
-        if (fgets(line, sizeof(line), stdin) == NULL) {
-            printf("setmqttca: read error\n");
+
+        ssize_t n = read(fd, buf + used, (buf_size - 1) - used);
+        if (n < 0) {
+            printf("setmqttca: console read error\n");
             return -1;
         }
-        size_t line_len = strlen(line);
-        if (used + line_len >= buf_size - 1) {
-            printf("setmqttca: certificate exceeds %u bytes\n", (unsigned)(buf_size - 1));
-            return -1;
+        if (n == 0) {
+            continue; /* readable but nothing consumed; re-arm the timeout */
         }
-        memcpy(buf + used, line, line_len);
-        used += line_len;
+        used += (size_t)n;
         buf[used] = '\0';
-        if (strstr(line, "-----END CERTIFICATE-----") != NULL) {
+        if (strstr(buf, END_MARKER) != NULL) {
             return (int)used;
         }
     }
