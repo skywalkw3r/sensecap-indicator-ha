@@ -49,7 +49,7 @@ extern "C" {
 #define CONFIG_HA_TEMP_VALUE_KEY                 "loft_temp"
 #define CONFIG_HA_HUMIDITY_VALUE_KEY             "loft_humidity"
 #define CONFIG_HA_CO2_VALUE_KEY                  "loft_co2"
-#define CONFIG_HA_TEMP_UI_NAME                   "Loft"
+#define CONFIG_HA_TEMP_UI_NAME                   "Temperature"
 #define CONFIG_HA_TEMP_UI_UNIT                   "°F"
 #define CONFIG_HA_HUMIDITY_UI_NAME               "Humidity"
 #define CONFIG_HA_HUMIDITY_UI_UNIT               "%"
