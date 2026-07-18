@@ -29,14 +29,15 @@ bool extract_ip_from_url(const char *url, char *ip, size_t ip_size) {
     if (!url || !ip || ip_size == 0) return false;
     const char *p = strstr(url, "://");
     p = p ? p + 3 : url;
-    size_t len = strlen(p);
+    const char *colon = strchr(p, ':');   /* stop before :port, like firmware */
+    size_t len = colon ? (size_t)(colon - p) : strlen(p);
     if (len >= ip_size) len = ip_size - 1;
     memcpy(ip, p, len);
     ip[len] = '\0';
     return true;
 }
 
-void assemble_broker_url(const char *ip, char *url, size_t url_size) {
+void assemble_broker_url(bool tls, const char *ip, char *url, size_t url_size) {
     if (!ip || !url || url_size == 0) return;
-    snprintf(url, url_size, "mqtt://%s", ip);
+    snprintf(url, url_size, "%s%s%s", tls ? "mqtts://" : "mqtt://", ip, tls ? ":8883" : ":1883");
 }

@@ -19,6 +19,7 @@
 #include "display/display_view.h"
 #include "sensor/sensor_view.h"
 #include "settings/settings_view.h"
+#include "ha_config.h"
 #include "wifi/wifi_view.h"
 #include "ha/ha_switch_screen.h"
 #include "ha/ha_trend_screen.h"
@@ -45,6 +46,7 @@ int main(void) {
     ha_switch_screen_create();
     ha_trend_screen_init();
     settings_view_init();
+    ha_config_view_init();   /* broker modal (VIEW_EVENT_SCREEN_START handler) */
 
     /* HA history model (registers the VIEW_EVENT_HA_SENSOR → VIEW_EVENT_HA_HISTORY
      * handler). Must run before the mock seeds so early samples are captured. */
@@ -53,6 +55,16 @@ int main(void) {
     const char *open_settings = getenv("SIM_OPEN_SETTINGS");
     if (open_settings && *open_settings) {
         settings_view_show();
+    }
+
+    /* SIM_OPEN_BROKER=1: open the MQTT broker modal through the real event
+     * path (ha_config.c's VIEW_EVENT_SCREEN_START handler). Capture with
+     * SIM_SCREENSHOT_LAYER=top since the modal lives on lv_layer_top(). */
+    const char *open_broker = getenv("SIM_OPEN_BROKER");
+    if (open_broker && *open_broker) {
+        uint8_t screen = SCREEN_BROKER_MODAL;
+        esp_event_post_to(view_event_handle, VIEW_EVENT_BASE,
+                          VIEW_EVENT_SCREEN_START, &screen, sizeof(screen), 0);
     }
 
     /* SIM_START_TILE=<n>: jump to nav tile n before the screenshot warm-up,

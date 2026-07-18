@@ -7,6 +7,8 @@
 #include "storage_nvs.h"
 #include "lv_port.h"
 #include "indicator_util.h"
+#include "ui_components.h"
+#include "ui_theme.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 
@@ -17,6 +19,39 @@ static const char *TAG = "ha-config";
 static lv_obj_t *s_broker_modal = NULL;
 static lv_obj_t *s_broker_ip_textarea = NULL;
 static lv_obj_t *s_broker_keyboard = NULL;
+static lv_obj_t *s_broker_scheme_dd = NULL;
+static lv_obj_t *s_broker_port_label = NULL;
+
+/* Dropdown option order: 0 = mqtt://, 1 = mqtts:// (see _ensure_broker_modal). */
+#define BROKER_SCHEME_OPT_TLS 1
+
+/* UI-local mirror of ha_tls_url_is_tls(): a plain prefix check, duplicated so
+ * this view (which the simulator compiles) never links against the TLS/mbedtls
+ * code in ha_tls.c. Keep in sync with the "mqtts://" scheme there. */
+static bool _url_is_tls(const char *url)
+{
+    return url && strncmp(url, "mqtts://", 8) == 0;
+}
+
+static bool _scheme_dd_is_tls(void)
+{
+    return s_broker_scheme_dd &&
+           lv_dropdown_get_selected(s_broker_scheme_dd) == BROKER_SCHEME_OPT_TLS;
+}
+
+static void _sync_port_label(void)
+{
+    if (s_broker_port_label) {
+        lv_label_set_text(s_broker_port_label, _scheme_dd_is_tls() ? ":8883" : ":1883");
+    }
+}
+
+static void _on_scheme_changed(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
+        _sync_port_label();
+    }
+}
 
 static const char *_get_broker_url(const void *event_data)
 {
@@ -163,25 +198,32 @@ static void _ensure_broker_modal(void)
     lv_obj_set_align(title, LV_ALIGN_BOTTOM_MID);
 
     lv_obj_t *container = lv_obj_create(s_broker_modal);
-    lv_obj_set_size(container, 420, 160);
+    lv_obj_set_size(container, 420, 232);
     lv_obj_set_align(container, LV_ALIGN_TOP_MID);
-    lv_obj_set_y(container, 120);
+    lv_obj_set_y(container, 105);
     lv_obj_remove_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+    ui_apply_card(container);
 
     lv_obj_t *input_title = lv_label_create(container);
-    lv_label_set_text(input_title, "MQTT Broker IP");
+    lv_label_set_text(input_title, "MQTT Broker");
     lv_obj_set_align(input_title, LV_ALIGN_TOP_MID);
-    lv_obj_set_y(input_title, 10);
+    lv_obj_set_y(input_title, 8);
 
-    lv_obj_t *prefix = lv_label_create(container);
-    lv_label_set_text(prefix, "mqtt://");
-    lv_obj_set_align(prefix, LV_ALIGN_LEFT_MID);
-    lv_obj_set_x(prefix, 25);
+    /* Row: [scheme dropdown] [ip field] [:port] — confirm sits below. */
+    s_broker_scheme_dd = lv_dropdown_create(container);
+    lv_dropdown_set_options_static(s_broker_scheme_dd, "mqtt://\nmqtts://");
+    lv_obj_set_size(s_broker_scheme_dd, 122, 50);
+    lv_obj_set_pos(s_broker_scheme_dd, 8, 52);
+    lv_obj_set_style_radius(s_broker_scheme_dd, UI_RADIUS_BUTTON,
+                            LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(s_broker_scheme_dd, UI_COLOR_SURFACE_PRESSED,
+                              LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_add_event_cb(s_broker_scheme_dd, _on_scheme_changed,
+                        LV_EVENT_VALUE_CHANGED, NULL);
 
     s_broker_ip_textarea = lv_textarea_create(container);
-    lv_obj_set_size(s_broker_ip_textarea, 155, LV_SIZE_CONTENT);
-    lv_obj_set_align(s_broker_ip_textarea, LV_ALIGN_CENTER);
-    lv_obj_set_x(s_broker_ip_textarea, -25);
+    lv_obj_set_size(s_broker_ip_textarea, 168, LV_SIZE_CONTENT);
+    lv_obj_set_pos(s_broker_ip_textarea, 142, 52);
     lv_textarea_set_accepted_chars(s_broker_ip_textarea, "0123456789.");
     lv_textarea_set_max_length(s_broker_ip_textarea, 20);
     lv_textarea_set_placeholder_text(s_broker_ip_textarea, "192.168.1.10");
@@ -191,16 +233,20 @@ static void _ensure_broker_modal(void)
     lv_obj_add_event_cb(s_broker_ip_textarea, _on_broker_keyboard_done,
                         LV_EVENT_DEFOCUSED, NULL);
 
-    lv_obj_t *suffix = lv_label_create(container);
-    lv_label_set_text(suffix, ":1883");
-    lv_obj_set_align(suffix, LV_ALIGN_CENTER);
-    lv_obj_set_x(suffix, 85);
+    s_broker_port_label = lv_label_create(container);
+    lv_label_set_text(s_broker_port_label, ":1883");
+    lv_obj_set_style_text_color(s_broker_port_label, UI_COLOR_TEXT_MUTED,
+                                LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_pos(s_broker_port_label, 322, 66);
 
     lv_obj_t *confirm = lv_button_create(container);
-    lv_obj_set_size(confirm, 94, 50);
-    lv_obj_set_align(confirm, LV_ALIGN_RIGHT_MID);
-    lv_obj_set_style_bg_color(confirm, lv_color_hex(0x4AAEE6),
+    lv_obj_set_size(confirm, 180, 52);
+    lv_obj_set_align(confirm, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_y(confirm, -12);
+    lv_obj_set_style_radius(confirm, UI_RADIUS_BUTTON, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(confirm, UI_COLOR_PRIMARY,
                               LV_PART_MAIN | LV_STATE_DEFAULT);
+    ui_make_pressable(confirm);
     lv_obj_add_event_cb(confirm, _on_broker_confirm, LV_EVENT_CLICKED, NULL);
     lv_obj_t *confirm_label = lv_label_create(confirm);
     lv_label_set_text(confirm_label, "Confirm");
@@ -236,6 +282,13 @@ static void update_ip_textfield(const char *broker_url)
          * placeholder shows instead of stale/garbage text. */
         lv_textarea_set_text(s_broker_ip_textarea, "");
     }
+
+    /* Reflect the stored scheme in the dropdown (and its default port). */
+    if (s_broker_scheme_dd) {
+        lv_dropdown_set_selected(s_broker_scheme_dd,
+                                 _url_is_tls(broker_url) ? BROKER_SCHEME_OPT_TLS : 0);
+        _sync_port_label();
+    }
 }
 
 static void _show_broker_modal(void)
@@ -248,7 +301,7 @@ static void _show_broker_modal(void)
     }
 }
 
-static void handle_mqtt_addr_change(const char *new_broker_ip)
+static void handle_mqtt_addr_change(const char *new_broker_ip, bool tls)
 {
     if (!is_valid_ipv4(new_broker_ip)) {
         ESP_LOGE(TAG, "Invalid IPv4 address: %s", new_broker_ip);
@@ -260,7 +313,7 @@ static void handle_mqtt_addr_change(const char *new_broker_ip)
     ha_cfg_get(&ha_cfg);
 
     char broker_url[MAX_BROKER_URL_LEN];
-    assemble_broker_url(new_broker_ip, broker_url, sizeof(broker_url));
+    assemble_broker_url(tls, new_broker_ip, broker_url, sizeof(broker_url));
 
     if (strlcpy(ha_cfg.broker_url, broker_url, sizeof(ha_cfg.broker_url)) >= sizeof(ha_cfg.broker_url)) {
         ESP_LOGE(TAG, "Broker URL too long");
@@ -298,7 +351,7 @@ static void view_event_handler(void *handler_args, esp_event_base_t base, int32_
             _ensure_broker_modal();
             const char *new_broker_ip = s_broker_ip_textarea ?
                 lv_textarea_get_text(s_broker_ip_textarea) : "";
-            handle_mqtt_addr_change(new_broker_ip);
+            handle_mqtt_addr_change(new_broker_ip, _scheme_dd_is_tls());
             break;
         }
         case VIEW_EVENT_HA_ADDR_DISPLAY: {

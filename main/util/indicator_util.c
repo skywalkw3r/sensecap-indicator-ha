@@ -86,10 +86,10 @@ bool extract_ip_from_url(const char* url, char* ip, size_t ip_size) {
 	return false;
 }
 
-void assemble_broker_url(const char* ip_address, char* broker_url, size_t broker_url_size) {
-	const char* prefix = "mqtt://"; // MQTT Protocol prefix
-	const char* suffix = ":1883"; // MQTT The default port
-	//const char* suffix = ""; // The default port
+void assemble_broker_url(bool tls, const char* ip_address, char* broker_url, size_t broker_url_size) {
+	// Scheme selects the default port; ha_mqtt wires TLS trust for mqtts://.
+	const char* prefix = tls ? "mqtts://" : "mqtt://";
+	const char* suffix = tls ? ":8883" : ":1883";
 
 	// 组装成完整的 broker URL，确保总长度不超过目标数组的大小
 	snprintf(broker_url, broker_url_size, "%s%s%s", prefix, ip_address, suffix);

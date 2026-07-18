@@ -43,6 +43,7 @@ set(STUB_SOURCES
     stubs/display_model_stub.c
     stubs/sensor_model_stub.c
     stubs/indicator_util_stub.c
+    stubs/ha_cfg_stub.c
 )
 
 # ── UI sources (hardware-free view layer only) ────────────────────────────────
@@ -59,6 +60,7 @@ set(UI_SOURCES
     ${FW_ROOT}/main/settings/settings_view.c
     ${FW_ROOT}/main/sensor/sensor_view.c
     ${FW_ROOT}/main/ha/ha_switch_screen.c
+    ${FW_ROOT}/main/ha/ha_config.c
     ${FW_ROOT}/main/ha/ha_history.c
     ${FW_ROOT}/main/ha/ha_trend_screen.c
     ${FW_ROOT}/main/wifi/wifi_connect_screen.c
