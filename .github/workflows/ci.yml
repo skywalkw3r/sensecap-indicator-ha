@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ESP32-S3 firmware — the real ESP-IDF build (idf.py), not plain CMake:
+  # the root project needs the Xtensa toolchain, IDF CMake glue, and the
+  # component manager, all provided by Espressif's pinned Docker image.
+  firmware:
+    name: Firmware (ESP-IDF v5.4.4, esp32s3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.4.4
+          target: esp32s3
+          command: idf.py build
+
+  # Desktop simulator — this one IS a plain CMake project. It compiles the
+  # real view/screen sources against host stubs, so it catches header/API
+  # drift in UI code without hardware (the exact rot class that once broke
+  # the sim at HEAD for weeks unnoticed).
+  simulator:
+    name: Simulator (SDL2, host build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL2
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev pkg-config
+      - name: Configure
+        run: cmake -S sim -B sim/build
+      - name: Build
+        run: cmake --build sim/build -j"$(nproc)"
+
+  # Repo gates — architecture scanner and protocol/regression tests.
+  # Pure-stdlib Python, seconds to run.
+  checks:
+    name: Checks (dev_check + protocol tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: dev_check (architecture scan + regression tripwires)
+        run: python3 scripts/dev_check.py --skip-build
+      - name: HA switch protocol
+        run: python3 scripts/test_ha_switch_protocol.py
+      - name: ESP32 <-> RP2040 protocol constants
+        run: python3 scripts/verify_rp2040_protocol.py
+      - name: dev CLI
+        run: python3 scripts/test_dev_cli.py
+
+  # RP2040 coprocessor firmware (PlatformIO). Header-only protocol changes
+  # on the ESP32 side must keep this side compiling — previously unverified
+  # by any automation.
+  rp2040:
+    name: RP2040 (PlatformIO)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ runner.os }}-${{ hashFiles('rp2040/platformio.ini') }}
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+      - name: Build
+        working-directory: rp2040
+        run: pio run
+
+  # Not covered here: on-hardware boot testing. A branch of this project once
+  # built clean everywhere and still crash-looped on boot (task-stack overflow
+  # only visible at runtime) — treat green CI as "compiles and gates pass",
+  # not "boots".
