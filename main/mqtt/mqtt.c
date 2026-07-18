@@ -48,6 +48,10 @@ static void mqtt_start_interface(instance_mqtt *instance, enum MQTT_APP_EVENT fl
     if (flag == MQTT_APP_RESTART && instance->mqtt_client) {
         esp_mqtt_client_stop(instance->mqtt_client);
         esp_mqtt_client_destroy(instance->mqtt_client);
+        /* NULL the handle: the starter (_mqtt_ha_start) checks it and would
+         * otherwise stop/destroy the freed client again — use-after-free +
+         * double-destroy on every console reconfigure while a client exists. */
+        instance->mqtt_client = NULL;
     }
 
     instance->mqtt_starter(instance);
