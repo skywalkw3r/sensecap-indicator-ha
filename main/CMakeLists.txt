@@ -27,3 +27,9 @@ idf_component_register(
   SRCS "main.c" "lv_port.c" "indicator_model.c" "indicator_view.c" ${COLLECTED_SOURCES}
   INCLUDE_DIRS "." ${DIRECTORIES_TO_INCLUDE}
 )
+
+# Hold the application component (our own code) to -Wall -Wextra. The project no
+# longer passes a blanket -w, but vendored (components/*) and managed components
+# keep the compiler default warning set so upstream code is not flooded — only
+# main/ is expected to be warning-free.
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra)

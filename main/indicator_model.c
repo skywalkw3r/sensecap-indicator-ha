@@ -48,4 +48,6 @@ int indicator_model_init(void) {
 #ifdef INDICATOR_TERMINAL_H
 	indicator_terminal_init();
 #endif
+
+	return 0;
 }

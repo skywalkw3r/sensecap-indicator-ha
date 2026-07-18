@@ -30,7 +30,7 @@ int update_sensor_data(const enum sensor_data_type type, uint8_t *p_data) {
     (void)type; (void)p_data; return 0;
 }
 
-int _sensor_data_parse_handle(uint8_t *p_data, ssize_t len) {
+int _sensor_data_parse_handle(uint8_t *p_data, size_t len) {
     (void)p_data; (void)len; return 0;
 }
 

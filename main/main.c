@@ -45,7 +45,7 @@ extern void indicator_model_init(void);
 static const char* TAG = "app_main";
 
 void app_main(void) {
-	ESP_LOGI("TAG", "system start");
+	ESP_LOGI(TAG, "system start");
 
 	ESP_LOGI("", SENSECAP, VERSION, __DATE__, __TIME__);
 
