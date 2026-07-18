@@ -41,10 +41,13 @@ class LcdRgbConfigTests(unittest.TestCase):
         self.assertGreaterEqual(int(match.group(1)), 8192)
 
     def test_avoid_tear_uses_full_refresh_not_direct_mode(self) -> None:
+        # Line-anchored: sdkconfig.defaults carries commented-out alternate
+        # render profiles (e.g. "# CONFIG_LCD_LVGL_DIRECT_MODE=y") that a
+        # substring check would false-positive on. Only ACTIVE lines count.
         text = SDKCONFIG_DEFAULTS.read_text()
 
-        self.assertIn("CONFIG_LCD_LVGL_FULL_REFRESH=y", text)
-        self.assertNotIn("CONFIG_LCD_LVGL_DIRECT_MODE=y", text)
+        self.assertIsNotNone(re.search(r"^CONFIG_LCD_LVGL_FULL_REFRESH=y$", text, re.M))
+        self.assertIsNone(re.search(r"^CONFIG_LCD_LVGL_DIRECT_MODE=y$", text, re.M))
 
     def test_lvgl_refresh_period_is_fast_enough_for_swipe_motion(self) -> None:
         text = SDKCONFIG_DEFAULTS.read_text()

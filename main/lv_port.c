@@ -197,6 +197,12 @@ static void lv_port_disp_init(void)
         .flags = {
             .buff_dma = false,
             .buff_spiram = true,
+            /* FULL_REFRESH and DIRECT_MODE are a mutually exclusive Kconfig
+             * choice (components/bsp/Kconfig.projbuild), so at most one of the
+             * two flags below is ever set. Both depend on CONFIG_LCD_AVOID_TEAR,
+             * which routes rendering into the RGB panel's two PSRAM
+             * framebuffers. Render-profile tradeoffs and the on-hardware A/B
+             * procedure live in docs/render-pipeline.md. */
 #if CONFIG_LCD_LVGL_FULL_REFRESH
             .full_refresh = true,
 #endif
