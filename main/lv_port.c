@@ -14,11 +14,18 @@
 #define LV_PORT_TASK_DELAY_MS        (5)
 #define LV_PORT_TASK_MAX_SLEEP_MS    (500)
 #define LV_PORT_TASK_STACK_SIZE      (8192)
+#define LV_PORT_ACTIVITY_MIN_MS      (1000)
 
 static const char *TAG = "lvgl_port";
 static lv_display_t *s_display = NULL;
 static lv_indev_t *s_indev_touchpad = NULL;
 static lv_indev_t *s_indev_button = NULL;
+
+/* Touch-read sleep filter state (owned by the LVGL port). */
+static volatile bool s_display_asleep = false;   /* set by the display domain */
+static bool s_touch_swallow = false;             /* swallow the current stroke */
+static lv_port_touch_cb_t s_touch_cb = NULL;     /* display-domain wake/activity hook */
+static uint32_t s_last_activity_ms = 0;          /* tick-gate for activity restarts */
 
 #ifndef CONFIG_LCD_TASK_PRIORITY
 #define CONFIG_LCD_TASK_PRIORITY    5
@@ -51,6 +58,21 @@ void lv_port_sem_take(void)
 void lv_port_sem_give(void)
 {
     lvgl_port_unlock();
+}
+
+void lv_port_display_set_touch_cb(lv_port_touch_cb_t cb)
+{
+    s_touch_cb = cb;
+}
+
+void lv_port_display_sleep_set(bool asleep)
+{
+    s_display_asleep = asleep;
+}
+
+bool lv_port_display_sleep_get(void)
+{
+    return s_display_asleep;
 }
 
 static void button_read(lv_indev_t *indev, lv_indev_data_t *data)
@@ -95,12 +117,52 @@ static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
         return;
     }
 
+    /* Display asleep: swallow all touch. Report no press to LVGL so widgets on
+     * the dark panel are never toggled. The first press only wakes the display
+     * through the registered callback. */
+    if (s_display_asleep) {
+        if (indev_data.pressed) {
+            if (!s_touch_swallow) {
+                s_touch_swallow = true;
+                if (s_touch_cb != NULL) {
+                    s_touch_cb(true);
+                }
+            }
+        } else {
+            s_touch_swallow = false;
+        }
+        data->state = LV_INDEV_STATE_RELEASED;
+        data->point.x = x;
+        data->point.y = y;
+        return;
+    }
+
+    /* Keep swallowing the stroke that woke the display until it is released, so
+     * the waking touch never lands on a widget once the backlight is back on. */
+    if (s_touch_swallow) {
+        if (indev_data.pressed) {
+            data->state = LV_INDEV_STATE_RELEASED;
+            data->point.x = x;
+            data->point.y = y;
+            return;
+        }
+        s_touch_swallow = false;
+    }
+
     if (indev_data.pressed) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->point.x = CONFIG_LCD_EVB_SCREEN_WIDTH - indev_data.x;
         data->point.y = CONFIG_LCD_EVB_SCREEN_HEIGHT - indev_data.y;
         x = data->point.x;
         y = data->point.y;
+
+        /* Touch activity restarts the sleep timer. Rate-limit to once per
+         * second so we never restart the esp_timer at touch-sample frequency. */
+        if (s_touch_cb != NULL &&
+            lv_tick_elaps(s_last_activity_ms) >= LV_PORT_ACTIVITY_MIN_MS) {
+            s_last_activity_ms = lv_tick_get();
+            s_touch_cb(false);
+        }
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
         data->point.x = x;

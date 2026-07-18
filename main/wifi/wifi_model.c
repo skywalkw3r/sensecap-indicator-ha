@@ -331,8 +331,23 @@ static void _indicator_wifi_task(void* p_arg) {
 				s_retry_num = 0;
 
 				esp_wifi_stop();
-				ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-				ESP_ERROR_CHECK(esp_wifi_start());
+
+				/* A transient Wi-Fi driver error here must not reboot the
+				 * device. Log it and let the reconnect loop retry on the next
+				 * cycle instead of aborting via ESP_ERROR_CHECK. */
+				esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
+				if(err != ESP_OK)
+				{
+					ESP_LOGE(TAG, "esp_wifi_set_mode failed: %s", esp_err_to_name(err));
+				}
+				else
+				{
+					err = esp_wifi_start();
+					if(err != ESP_OK)
+					{
+						ESP_LOGE(TAG, "esp_wifi_start failed: %s", esp_err_to_name(err));
+					}
+				}
 			}
 			_g_wifi_model.wifi_reconnect_cnt++;
 		}

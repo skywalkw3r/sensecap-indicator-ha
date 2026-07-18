@@ -8,6 +8,7 @@
 #include <string.h>
 #include "driver/ledc.h"
 #include "esp_timer.h"
+#include "lv_port.h"
 
 #define DISPLAY_CFG_STORAGE "display"
 
@@ -127,12 +128,14 @@ static void _lcd_bl_off(void) {
 }
 
 static void _sleep_mode_timer_callback(void* arg) {
-	ESP_LOGI(TAG, "sleep mode, lcd bl off");
-	_lcd_bl_off();
+	ESP_LOGI(TAG, "sleep mode timeout, screen off");
+	/* One-shot has fired: mark the timer disarmed here so the SCREEN_CTRL
+	 * consumer's _timer_stop() becomes a no-op and never races esp_timer_stop()
+	 * against this very callback. The backlight is turned off by the consumer so
+	 * that every on/off flows through the single sleep/wake code path. */
 	_timer_st_set(false);
 
 	bool st = 0;
-	st = 0;
 	esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_CTRL, &st, sizeof(st),
 					  portMAX_DELAY);
 }
@@ -141,7 +144,14 @@ static void _timer_stop(void) {
 	if(_timer_st_get())
 	{
 		xSemaphoreTake(_g_timer_mutex, portMAX_DELAY);
-		ESP_ERROR_CHECK(esp_timer_stop(sleep_timer_handle));
+		/* esp_timer_stop() races the one-shot callback: if the timer already
+		 * fired it is no longer running and returns ESP_ERR_INVALID_STATE.
+		 * Tolerate that specific case instead of aborting via ESP_ERROR_CHECK. */
+		esp_err_t err = esp_timer_stop(sleep_timer_handle);
+		if(err != ESP_OK && err != ESP_ERR_INVALID_STATE)
+		{
+			ESP_LOGE(TAG, "esp_timer_stop failed: %s", esp_err_to_name(err));
+		}
 		xSemaphoreGive(_g_timer_mutex);
 		_timer_st_set(false);
 	}
@@ -215,6 +225,25 @@ static void _display_cfg_restore(void) {
 	}
 }
 
+/*
+ * Touch hook registered with the LVGL port. Runs in the LVGL task context, so
+ * the wake path only posts an event (bounded wait) instead of driving the
+ * backlight directly; the activity path restarts the sleep timer, which the
+ * port already rate-limits to once per second.
+ */
+static void _lv_touch_cb(bool wake) {
+	if(wake)
+	{
+		bool st = 1;
+		esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_CTRL, &st,
+						  sizeof(st), pdMS_TO_TICKS(20));
+	}
+	else
+	{
+		indicator_display_sleep_restart();
+	}
+}
+
 static void _view_event_handler(void* handler_args, esp_event_base_t base, int32_t id,
 								 void* event_data) {
 	switch(id)
@@ -242,6 +271,29 @@ static void _view_event_handler(void* handler_args, esp_event_base_t base, int32
 			_display_cfg_set(p_cfg);
 			_display_cfg_save(p_cfg);
 			_sleep_mode_restart(p_cfg->sleep_mode_en, p_cfg->sleep_mode_time_min);
+			break;
+		}
+		case VIEW_EVENT_SCREEN_CTRL:
+		{
+			/* Single sleep/wake actuator: every producer (btn, sleep timer,
+			 * touch wake) posts here, and this is the one place that drives the
+			 * backlight/timer and keeps the LVGL port's sleep flag in sync. */
+			bool on = false;
+			if(event_data != NULL)
+			{
+				on = *(bool*)event_data;
+			}
+			ESP_LOGI(TAG, "event: VIEW_EVENT_SCREEN_CTRL, on:%d", on);
+			if(on)
+			{
+				indicator_display_on();
+				lv_port_display_sleep_set(false);
+			}
+			else
+			{
+				indicator_display_off();
+				lv_port_display_sleep_set(true);
+			}
 			break;
 		}
 
@@ -273,7 +325,14 @@ int indicator_display_init(void) {
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE,
 															 VIEW_EVENT_DISPLAY_CFG_APPLY,
 															 _view_event_handler, NULL, NULL));
+
+	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE,
+															 VIEW_EVENT_SCREEN_CTRL,
+															 _view_event_handler, NULL, NULL));
 	init_done_flag = true;
+
+	/* Let the LVGL port swallow touch while asleep and report wake/activity. */
+	lv_port_display_set_touch_cb(_lv_touch_cb);
 	return 0;
 }
 

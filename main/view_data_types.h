@@ -199,7 +199,10 @@ enum {
     /* C: wifi/wifi_model.c  Payload: NULL */
     VIEW_EVENT_FACTORY_RESET,
 
-    /* P: btn/btn.c, display/display_model.c  Payload: bool (0=off, 1=on) */
+    /* P: btn/btn.c, display/display_model.c (sleep timer + LVGL-port touch wake)
+     * C: display/display_model.c (single actuator: backlight on/off + timer,
+     *    and syncs the lv_port sleep flag)
+     * Payload: bool (0=off, 1=on) */
     VIEW_EVENT_SCREEN_CTRL,
 
     /* P: ha/ha_config.c  C: ha/ha_config.c  Payload: NULL (reads textarea directly) */
