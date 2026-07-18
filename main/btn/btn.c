@@ -31,7 +31,14 @@ __attribute__((weak)) bool indicator_display_st_get(void) {
 }
 
 static void _factory_reset_callback(void *arg) {
-    ESP_ERROR_CHECK(nvs_flash_erase());
+    /* Factory reset is user-initiated and always ends in a restart. If the
+     * erase fails we log it and still restart rather than aborting: an abort
+     * would panic-reboot anyway, so a logged error plus one controlled restart
+     * is cleaner and still honors the user's reset request. */
+    esp_err_t err = nvs_flash_erase();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs_flash_erase failed: %s", esp_err_to_name(err));
+    }
     fflush(stdout);
     esp_restart();
 }
@@ -46,7 +53,6 @@ static void _btn_click_callback(void *arg) {
     }
     if (indicator_display_st_get()) {
         ESP_LOGI(TAG, "click, off");
-        indicator_display_off();
         st = 0;
         esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_CTRL, &st,
                           sizeof(st), portMAX_DELAY);
@@ -55,7 +61,6 @@ static void _btn_click_callback(void *arg) {
         st = 1;
         esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_CTRL, &st,
                           sizeof(st), portMAX_DELAY);
-        indicator_display_on();
     }
 }
 
@@ -81,7 +86,6 @@ static void _btn_long_press_hold_callback(void *arg) {
         } else if (!sleep_start_flag) {
             sleep_start_flag = true;
             ESP_LOGI(TAG, "long_press: entry sleep mode");
-            indicator_display_off();
             bool st = 0;
             esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_CTRL, &st,
                               sizeof(st), portMAX_DELAY);
@@ -94,7 +98,6 @@ static void _btn_long_press_hold_callback(void *arg) {
         bool st = 1;
         esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_CTRL, &st,
                           sizeof(st), portMAX_DELAY);
-        indicator_display_on();
 
         const esp_timer_create_args_t timer_args = {
             .callback = &_factory_reset_callback,

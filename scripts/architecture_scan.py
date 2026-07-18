@@ -51,6 +51,12 @@ SYMBOL_ALLOWLIST_REASONS: dict[tuple[str, str, str], str] = {
     ("main/ha/ha_switch.c", "lvgl-outside-view", "lv_port_sem_give"): (
         "HA switch controller releases the LVGL port semaphore after updating its screen component"
     ),
+    ("main/display/display_model.c", "lvgl-outside-view", "lv_port_display_set_touch_cb"): (
+        "display domain registers its wake/activity touch hook with the LVGL port; no widget access"
+    ),
+    ("main/display/display_model.c", "lvgl-outside-view", "lv_port_display_sleep_set"): (
+        "display domain sets the LVGL port sleep flag so the port can filter touch; no widget access"
+    ),
 }
 
 
