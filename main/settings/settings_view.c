@@ -187,15 +187,11 @@ static void settings_create_modal(void)
 						 UI_COLOR_AMBER, "Display", LV_SYMBOL_IMAGE,
 						 settings_open_display);
 
-	lv_obj_t *broker = lv_button_create(s_settings_modal);
-	lv_obj_set_size(broker, 360, 60);
-	lv_obj_set_pos(broker, 60, 330);
-	settings_style_card(broker);
-	lv_obj_add_event_cb(broker, settings_open_broker, LV_EVENT_CLICKED, NULL);
-
-	lv_obj_t *broker_label = ui_label(broker, "Change MQTT Broker Address",
-									  UI_FONT_BODY, UI_COLOR_TEXT);
-	lv_obj_center(broker_label);
+	/* Third card, centered under the WiFi/Display row — same component so the
+	 * broker entry matches the other settings buttons. */
+	settings_create_card(s_settings_modal, 165, 320,
+						 UI_COLOR_GREEN, "MQTT", LV_SYMBOL_UPLOAD,
+						 settings_open_broker);
 }
 
 int settings_view_init(void)
