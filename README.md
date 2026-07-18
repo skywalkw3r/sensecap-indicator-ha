@@ -1,5 +1,7 @@
 # SenseCAP Indicator — Home Assistant Firmware
 
+[![CI](https://github.com/skywalkw3r/sensecap-indicator-ha/actions/workflows/ci.yml/badge.svg)](https://github.com/skywalkw3r/sensecap-indicator-ha/actions/workflows/ci.yml)
+
 Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) into a Home Assistant companion panel. Connects to Wi-Fi, publishes built-in sensor data over MQTT, and renders on-screen controls that Home Assistant can drive both ways.
 
 <figure class="third">
