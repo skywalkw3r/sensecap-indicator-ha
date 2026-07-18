@@ -111,3 +111,4 @@ click_deploy.zip
 
 # ESP-IDF Component Manager downloads — fetched from idf_component.yml on build.
 managed_components/
+__pycache__/
