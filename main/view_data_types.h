@@ -22,9 +22,12 @@ enum start_screen {
 #define WIFI_SCAN_LIST_SIZE 15
 
 struct view_data_wifi_st {
-    bool    is_connected;
-    bool    is_connecting;
-    bool    is_network;
+    bool    is_connected;   /* station associated to the AP (drives the status icon) */
+    bool    is_connecting;  /* association in progress */
+    bool    is_network;     /* station has an IP (set on IP_EVENT_STA_GOT_IP);
+                             * this is the MQTT start gate — NOT internet
+                             * reachability. The diagnostic gateway ping never
+                             * writes this field. */
     char    ssid[32];
     int8_t  rssi;
 };
@@ -149,8 +152,11 @@ enum {
     /* P: display/display_model.c  C: display/display_view.c  Payload: bool */
     VIEW_EVENT_TIME,
 
-    /* P: wifi/wifi_model.c  C: mqtt/mqtt.c, wifi/wifi_view.c, ha/ha_mqtt.c */
-    VIEW_EVENT_WIFI_ST,             /* struct view_data_wifi_st */
+    /* P: wifi/wifi_model.c (STA connect + IP_EVENT_STA_GOT_IP)
+     * C: mqtt/mqtt.c, wifi/wifi_view.c, ha/ha_mqtt.c
+     * Payload: struct view_data_wifi_st. is_network=true ("has IP") gates the
+     * MQTT start; the diagnostic gateway ping never posts this event. */
+    VIEW_EVENT_WIFI_ST,
 
     /* P/C: TODO  Payload: char city[32] */
     VIEW_EVENT_CITY,

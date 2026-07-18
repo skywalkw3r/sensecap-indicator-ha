@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -6,6 +7,7 @@
 #include "mqtt.h"
 #include "esp_log.h"
 #include "esp_event.h"
+#include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -71,7 +73,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 static void handle_wifi_status_change(const struct view_data_wifi_st *wifi_status)
 {
-    ESP_LOGI(TAG, "WiFi status changed. Connected: %d", wifi_status->is_network);
+    ESP_LOGI(TAG, "WiFi status changed. Network up: %d", wifi_status->is_network);
     if (wifi_status->is_network && instance_ptr->is_using) {
         esp_event_post_to(mqtt_app_event_handle, MQTT_APP_EVENT_BASE, MQTT_APP_START, &instance_ptr, sizeof(instance_mqtt_t), portMAX_DELAY);
     } else {
@@ -100,9 +102,17 @@ static void _cfg_event_handler(void *handler_args, esp_event_base_t base, int32_
             }
             const char *broker_url = (const char *)event_data;
             ESP_LOGI(TAG, "HA_CFG_BROKER_CHANGED: %s", broker_url);
-            esp_mqtt_client_stop(instance_ptr->mqtt_client);
-            esp_mqtt_client_set_uri(instance_ptr->mqtt_client, broker_url);
-            esp_mqtt_client_start(instance_ptr->mqtt_client);
+            if (instance_ptr->mqtt_client) {
+                /* Client already exists: retarget it in place. */
+                esp_mqtt_client_stop(instance_ptr->mqtt_client);
+                esp_mqtt_client_set_uri(instance_ptr->mqtt_client, broker_url);
+                esp_mqtt_client_start(instance_ptr->mqtt_client);
+            } else {
+                /* Fresh device: no client yet. Create and start one now (reads
+                 * the just-saved config from NVS) so the broker takes effect
+                 * immediately instead of only after a reboot. */
+                _mqtt_ha_start(instance_ptr);
+            }
             break;
         }
         default:
@@ -128,9 +138,22 @@ static void _mqtt_ha_start(instance_mqtt *instance)
     }
 
     ha_cfg_interface hf_cfg;
-    if (ha_cfg_get(&hf_cfg) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get HA configuration");
+    if (ha_cfg_get(&hf_cfg) != ESP_OK || hf_cfg.broker_url[0] == '\0') {
+        /* Unconfigured device: this is not an error. Stay idle until a broker
+         * is set via the touchscreen or `setmqtt`. */
+        ESP_LOGI(TAG, "MQTT idle: no broker configured");
         return;
+    }
+
+    /* Fall back to a MAC-derived client id so the broker never sees an empty
+     * id when the user configured only a broker address. */
+    char client_id[24];
+    if (hf_cfg.client_id[0] != '\0') {
+        strlcpy(client_id, hf_cfg.client_id, sizeof(client_id));
+    } else {
+        uint8_t mac[6] = {0};
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        snprintf(client_id, sizeof(client_id), "indicator%02X%02X%02X", mac[3], mac[4], mac[5]);
     }
 
     instance->mqtt_cfg = (esp_mqtt_client_config_t *)malloc(sizeof(esp_mqtt_client_config_t));
@@ -140,13 +163,13 @@ static void _mqtt_ha_start(instance_mqtt *instance)
     }
     *instance->mqtt_cfg = (esp_mqtt_client_config_t){
         .broker.address.uri = hf_cfg.broker_url,
-        .credentials.client_id = hf_cfg.client_id,
+        .credentials.client_id = client_id,
         .credentials.username = hf_cfg.username,
         .credentials.authentication.password = hf_cfg.password,
     };
 
     ESP_LOGI(TAG, "| Broker Address               | %-40s |", hf_cfg.broker_url);
-    ESP_LOGI(TAG, "| Client ID                    | %-40s |", hf_cfg.client_id);
+    ESP_LOGI(TAG, "| Client ID                    | %-40s |", client_id);
     ESP_LOGI(TAG, "| username                     | %-40s |", hf_cfg.username);
     ESP_LOGI(TAG, "| password                     | %-40s |", hf_cfg.password);
 

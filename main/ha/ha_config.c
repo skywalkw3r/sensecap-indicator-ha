@@ -222,10 +222,14 @@ static void update_ip_textfield(const char *broker_url)
     }
 
     char ip[16];
-    if (extract_ip_from_url(broker_url, ip, sizeof(ip))) {
+    if (broker_url && broker_url[0] && extract_ip_from_url(broker_url, ip, sizeof(ip))) {
         lv_textarea_set_text(s_broker_ip_textarea, ip);
     } else {
-        ESP_LOGE(TAG, "Failed to extract IP from URL: %s", broker_url);
+        if (broker_url && broker_url[0]) {
+            ESP_LOGE(TAG, "Failed to extract IP from URL: %s", broker_url);
+        }
+        /* Unconfigured (or unparseable): leave the field empty so its
+         * placeholder shows instead of stale/garbage text. */
         lv_textarea_set_text(s_broker_ip_textarea, "");
     }
 }
@@ -233,10 +237,7 @@ static void update_ip_textfield(const char *broker_url)
 static void _show_broker_modal(void)
 {
     _ensure_broker_modal();
-    const char *broker_url = _get_broker_url(NULL);
-    if (broker_url) {
-        update_ip_textfield(broker_url);
-    }
+    update_ip_textfield(_get_broker_url(NULL));
     if (s_broker_modal) {
         lv_obj_remove_flag(s_broker_modal, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(s_broker_modal);
@@ -297,12 +298,8 @@ static void view_event_handler(void *handler_args, esp_event_base_t base, int32_
             break;
         }
         case VIEW_EVENT_HA_ADDR_DISPLAY: {
-            const char *broker_url = _get_broker_url(event_data);
-            if (broker_url) {
-                update_ip_textfield(broker_url);
-            } else {
-                ESP_LOGE(TAG, "Failed to get broker URL for display");
-            }
+            /* NULL-safe: shows the placeholder when no broker is configured. */
+            update_ip_textfield(_get_broker_url(event_data));
             break;
         }
         default:
@@ -320,17 +317,23 @@ esp_err_t ha_cfg_get(ha_cfg_interface *ha_cfg)
     esp_err_t err = indicator_nvs_read(MQTT_HA_CFG_STORAGE, ha_cfg, &len);
     if (err == ESP_OK && len == sizeof(ha_cfg_interface)) {
         ESP_LOGI(TAG, "mqtt broker cfg read successful");
-    } else {
-        if (err == ESP_ERR_NVS_NOT_FOUND) {
-            ESP_LOGI(TAG, "mqtt broker cfg not find");
-        } else {
-            ESP_LOGI(TAG, "mqtt broker cfg read err:%d", err);
-        }
-        strlcpy(ha_cfg->broker_url, CONFIG_BROKER_URL, sizeof(ha_cfg->broker_url));
-        strlcpy(ha_cfg->client_id, CONFIG_MQTT_CLIENT_ID, sizeof(ha_cfg->client_id));
-        strlcpy(ha_cfg->username, CONFIG_MQTT_USERNAME, sizeof(ha_cfg->username));
-        strlcpy(ha_cfg->password, CONFIG_MQTT_PASSWORD, sizeof(ha_cfg->password));
+        return ESP_OK;
     }
+
+    /* No valid stored config. Return a zeroed config plus a distinct status so
+     * callers treat the device as unconfigured — never fall back to a
+     * compiled-in public broker or default credentials. */
+    memset(ha_cfg, 0, sizeof(ha_cfg_interface));
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGI(TAG, "no MQTT config stored — configure via touchscreen or setmqtt");
+        return ESP_ERR_NVS_NOT_FOUND;
+    }
+    if (err == ESP_OK) {
+        /* Read succeeded but the blob size no longer matches the struct. */
+        ESP_LOGW(TAG, "stored MQTT config invalid (size mismatch) — reconfigure");
+        return ESP_ERR_INVALID_SIZE;
+    }
+    ESP_LOGW(TAG, "mqtt broker cfg read err:%d — treating as unconfigured", err);
     return err;
 }
 

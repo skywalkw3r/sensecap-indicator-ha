@@ -138,6 +138,18 @@ static void _ip_event_handler(void* arg, esp_event_base_t event_base, int32_t ev
 		ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 		s_retry_num = 0;
 
+		/* Got an IP: the LAN is usable. Mark the network up immediately and
+		 * publish it so MQTT can start now, without waiting for an
+		 * internet-reachability ping (many HA IoT VLANs have no internet
+		 * egress). The ping below only refines status, never gates MQTT. */
+		struct view_data_wifi_st st;
+		_wifi_st_get(&st);
+		st.is_connected = true;
+		st.is_network = true;
+		_wifi_st_set(&st);
+		esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_ST, &st,
+						  sizeof(struct view_data_wifi_st), portMAX_DELAY);
+
 		xSemaphoreGive(_g_net_check_sem);
 	}
 }
@@ -257,29 +269,29 @@ static void _ping_end(esp_ping_handle_t hdl, void* args) {
 
 	esp_ping_delete_session(hdl);
 
-	struct view_data_wifi_st st;
-	if(received > 0)
-	{
-		_wifi_st_get(&st);
-		st.is_network = true;
-		_wifi_st_set(&st);
-	}
-	else
-	{
-		_wifi_st_get(&st);
-		st.is_network = false;
-		_wifi_st_set(&st);
-	}
-	esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_ST, &st, sizeof(struct view_data_wifi_st),
-					  portMAX_DELAY);
+	/* Diagnostic only: internet reachability is reported to the console but is
+	 * NOT written back into is_network. Network usability (and therefore MQTT
+	 * gating) is owned by IP_EVENT_STA_GOT_IP, so a failed gateway ping never
+	 * stops or gates an MQTT client. */
 	_g_ping_done = true;
 }
 
 static void _ping_start(void) {
 	esp_ping_config_t config = ESP_PING_DEFAULT_CONFIG();
 
+	/* Ping the LAN default gateway (reachable without internet egress). Only
+	 * fall back to a public anycast address if no gateway is known. */
 	ip_addr_t target_addr;
-	ipaddr_aton("1.1.1.1", &target_addr);
+	esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+	esp_netif_ip_info_t ip_info = {0};
+	if(netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK && ip_info.gw.addr != 0)
+	{
+		ip_addr_set_ip4_u32(&target_addr, ip_info.gw.addr);
+	}
+	else
+	{
+		ipaddr_aton("1.1.1.1", &target_addr);
+	}
 
 	config.target_addr = target_addr;
 

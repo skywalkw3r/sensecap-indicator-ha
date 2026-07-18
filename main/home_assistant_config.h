@@ -17,12 +17,16 @@ extern "C" {
 #endif
 
 
-// #define CONFIG_BROKER_URL                        "mqtt://homeassistant.local" /* domain */
-#define CONFIG_BROKER_URL                        "mqtt://broker.emqx.io" /* for receive testing */
-// #define CONFIG_BROKER_URL                        "mqtt://192.168.12.253" /* IPV4 */
-#define CONFIG_MQTT_CLIENT_ID                    "indicator-id"
-#define CONFIG_MQTT_USERNAME                     "indicator-usr"
-#define CONFIG_MQTT_PASSWORD                     "indicator-password"
+/* Default MQTT config is intentionally EMPTY: a device ships unconfigured and
+ * must be pointed at a broker via the touchscreen MQTT page or `setmqtt`.
+ * Never fall back to a public internet broker (e.g. broker.emqx.io) — that
+ * would silently repoint a configured device onto the public internet. */
+#define CONFIG_BROKER_URL                        ""
+/* The following are examples only and are NOT auto-applied as defaults; the
+ * runtime client id falls back to "indicator" + MAC suffix when unset. */
+#define CONFIG_MQTT_CLIENT_ID                    ""
+#define CONFIG_MQTT_USERNAME                     ""
+#define CONFIG_MQTT_PASSWORD                     ""
 
 #define CONFIG_HA_SENSOR_ENTITY_NUM              6
 #define CONFIG_HA_SWITCH_ENTITY_NUM              8
