@@ -26,11 +26,6 @@ enum MQTT_APP_EVENT {
     MQTT_APP_ALL,
 };
 
-typedef struct {
-    char topic[64];
-    char data[256];
-} mqtt_data_t;
-
 typedef struct instance_mqtt instance_mqtt;
 typedef void (*MQTTStartFn)(instance_mqtt *instance);
 struct instance_mqtt {

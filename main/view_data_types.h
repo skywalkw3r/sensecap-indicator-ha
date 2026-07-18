@@ -140,32 +140,17 @@ struct view_data_ha_switch_data {
  *   LVGL    — "lock required" = consumer must hold lv_port semaphore
  *
  * Bus: view_event_handle (main.c). Other buses: mqtt_app_event_handle,
- * ha_cfg_event_handle, cmd_cfg_event_handle.
+ * ha_cfg_event_handle.
  */
 enum {
     /* P: wifi/wifi_model.c  C: wifi/wifi_view.c  Payload: uint8_t (enum start_screen) */
     VIEW_EVENT_SCREEN_START = 0,
 
-    /* P: display/display_model.c  C: display/display_view.c  Payload: bool */
-    VIEW_EVENT_TIME,
-
     /* P: wifi/wifi_model.c  C: mqtt/mqtt.c, wifi/wifi_view.c, ha/ha_mqtt.c */
     VIEW_EVENT_WIFI_ST,             /* struct view_data_wifi_st */
 
-    /* P/C: TODO  Payload: char city[32] */
-    VIEW_EVENT_CITY,
-
     /* P: rp2040/rp2040.c  C: sensor/sensor_view.c, ha/ha_sensor.c */
     VIEW_EVENT_SENSOR_DATA,         /* struct view_data_sensor_data */
-
-    /* Trigger-only events (NULL payload) */
-    VIEW_EVENT_SENSOR_TEMP_HISTORY,
-    VIEW_EVENT_SENSOR_HUMIDITY_HISTORY,
-    VIEW_EVENT_SENSOR_TVOC_HISTORY,
-    VIEW_EVENT_SENSOR_CO2_HISTORY,
-
-    /* P/C: TODO  Payload: struct view_data_sensor_history_data */
-    VIEW_EVENT_SENSOR_DATA_HISTORY,
 
     /* P: wifi/wifi_model.c  C: wifi/wifi_view.c  Payload: struct view_data_wifi_list */
     VIEW_EVENT_WIFI_LIST,
@@ -181,10 +166,6 @@ enum {
 
     VIEW_EVENT_WIFI_CFG_DELETE,     /* NULL */
 
-    /* P/C: TODO  Payload: struct view_data_time_cfg */
-    VIEW_EVENT_TIME_CFG_UPDATE,
-    VIEW_EVENT_TIME_CFG_APPLY,
-
     /* P: display/display_model.c, display/display_view.c  Payload: struct view_data_display */
     VIEW_EVENT_DISPLAY_CFG,
 
@@ -196,7 +177,8 @@ enum {
     /* P: btn/btn.c  C: wifi/wifi_model.c, rp2040/rp2040.c  Payload: NULL */
     VIEW_EVENT_SHUTDOWN,
 
-    /* C: wifi/wifi_model.c  Payload: NULL */
+    /* P: btn/btn.c  C: *** NO CONSUMER — posted but not yet handled ***  Payload: NULL
+     * (wifi_model.c does not currently register a handler for this event) */
     VIEW_EVENT_FACTORY_RESET,
 
     /* P: btn/btn.c, display/display_model.c  Payload: bool (0=off, 1=on) */

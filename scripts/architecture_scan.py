@@ -95,18 +95,6 @@ OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, str], str] = {
 
 
 EVENT_COMMENT_ALLOWLIST_REASONS: dict[str, str] = {
-    "VIEW_EVENT_SENSOR_TEMP_HISTORY": (
-        "existing sensor history event has implicit payload handling in current views"
-    ),
-    "VIEW_EVENT_SENSOR_HUMIDITY_HISTORY": (
-        "existing sensor history event has implicit payload handling in current views"
-    ),
-    "VIEW_EVENT_SENSOR_TVOC_HISTORY": (
-        "existing sensor history event has implicit payload handling in current views"
-    ),
-    "VIEW_EVENT_SENSOR_CO2_HISTORY": (
-        "existing sensor history event has implicit payload handling in current views"
-    ),
     "VIEW_EVENT_WIFI_CFG_DELETE": (
         "existing Wi-Fi config delete event has no documented payload in current code"
     ),
