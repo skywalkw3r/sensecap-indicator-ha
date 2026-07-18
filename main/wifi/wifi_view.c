@@ -7,6 +7,8 @@
 #include "indicator_util.h"
 #include "nav.h"
 #include "sdkconfig.h"
+#include "ui_components.h"
+#include "ui_theme.h"
 
 LV_IMAGE_DECLARE(ui_img_wifi_1_png);
 LV_IMAGE_DECLARE(ui_img_wifi_2_png);
@@ -68,54 +70,8 @@ static void _on_wifi_modal_back(lv_event_t *e) {
 static void _ensure_wifi_modal(void) {
     if(s_wifi_modal) return;
 
-    s_wifi_modal = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(s_wifi_modal, CONFIG_LCD_EVB_SCREEN_WIDTH, CONFIG_LCD_EVB_SCREEN_HEIGHT);
-    lv_obj_set_align(s_wifi_modal, LV_ALIGN_CENTER);
-    lv_obj_add_flag(s_wifi_modal, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(s_wifi_modal, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
-    lv_obj_set_style_bg_color(s_wifi_modal, lv_color_hex(0x101418),
-                              LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(s_wifi_modal, LV_OPA_COVER,
-                            LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(s_wifi_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(s_wifi_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_all(s_wifi_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_add_flag(s_wifi_modal, LV_OBJ_FLAG_HIDDEN);
-
-    lv_obj_t *header = lv_obj_create(s_wifi_modal);
-    lv_obj_set_size(header, 480, 85);
-    lv_obj_set_align(header, LV_ALIGN_TOP_MID);
-    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP,
-                            LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_opa(header, LV_OPA_TRANSP,
-                                LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_t *back = lv_button_create(header);
-    lv_obj_set_size(back, 100, 50);
-    lv_obj_set_pos(back, 10, 17);
-    lv_obj_set_style_bg_opa(back, LV_OPA_TRANSP,
-                            LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(back, lv_color_hex(0x2a3036),
-                              LV_PART_MAIN | LV_STATE_PRESSED);
-    lv_obj_set_style_bg_opa(back, LV_OPA_40,
-                            LV_PART_MAIN | LV_STATE_PRESSED);
-    lv_obj_set_style_border_width(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(back, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_all(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_shadow_width(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_add_event_cb(back, _on_wifi_modal_back, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *back_label = lv_label_create(back);
-    lv_label_set_text(back_label, LV_SYMBOL_LEFT " Back");
-    lv_obj_set_style_text_color(back_label, lv_color_hex(0xe7ecef),
-                                LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_center(back_label);
-
-    lv_obj_t *title = lv_label_create(header);
-    lv_label_set_text(title, "Wi-Fi");
-    lv_obj_set_style_text_color(title, lv_color_white(),
-                                LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_align(title, LV_ALIGN_BOTTOM_MID);
+    s_wifi_modal = ui_modal_create();
+    ui_modal_header(s_wifi_modal, "Wi-Fi", _on_wifi_modal_back, NULL);
 
     s_wifi_spinner = lv_spinner_create(s_wifi_modal);
     lv_spinner_set_anim_params(s_wifi_spinner, 1000, 90);
@@ -134,6 +90,7 @@ static void _show_wifi_modal(void) {
 
     lv_obj_remove_flag(s_wifi_modal, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(s_wifi_modal);
+    ui_modal_anim_in(s_wifi_modal);
     wifi_list_screen_show_spinner(s_list_screen);
 
     s_wifi_scan_pending = true;
@@ -164,7 +121,7 @@ static void _ensure_wifi_status_icon(void) {
     lv_obj_set_align(button, LV_ALIGN_TOP_RIGHT);
     lv_obj_set_pos(button, -10, 10);
     lv_obj_remove_flag(button, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(button, lv_color_hex(0x101418),
+    lv_obj_set_style_bg_color(button, UI_COLOR_BG,
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(button, LV_OPA_COVER,
                             LV_PART_MAIN | LV_STATE_DEFAULT);

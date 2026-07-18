@@ -10,6 +10,8 @@
 #include "display_model.h"
 #include "display_view.h"
 #include "lv_port.h"
+#include "ui_components.h"
+#include "ui_theme.h"
 #include "view_data.h"
 #include <esp_log.h>
 #include "sdkconfig.h"
@@ -69,7 +71,7 @@ static void _hide_display_modal(void) {
 	}
 	if(s_display_modal)
 	{
-		lv_obj_add_flag(s_display_modal, LV_OBJ_FLAG_HIDDEN);
+		ui_modal_anim_out(s_display_modal);
 	}
 }
 
@@ -122,59 +124,13 @@ static void _ensure_display_modal(void) {
 		return;
 	}
 
-	s_display_modal = lv_obj_create(lv_layer_top());
-	lv_obj_set_size(s_display_modal, CONFIG_LCD_EVB_SCREEN_WIDTH, CONFIG_LCD_EVB_SCREEN_HEIGHT);
-	lv_obj_set_align(s_display_modal, LV_ALIGN_CENTER);
-	lv_obj_add_flag(s_display_modal, LV_OBJ_FLAG_CLICKABLE);
-	lv_obj_remove_flag(s_display_modal, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
-	lv_obj_set_style_bg_color(s_display_modal, lv_color_hex(0x101418),
-							  LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_bg_opa(s_display_modal, LV_OPA_COVER,
-							LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_border_width(s_display_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_radius(s_display_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_pad_all(s_display_modal, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_add_flag(s_display_modal, LV_OBJ_FLAG_HIDDEN);
-
-	lv_obj_t* header = lv_obj_create(s_display_modal);
-	lv_obj_set_size(header, 480, 85);
-	lv_obj_set_align(header, LV_ALIGN_TOP_MID);
-	lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
-	lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP,
-							LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_border_opa(header, LV_OPA_TRANSP,
-								LV_PART_MAIN | LV_STATE_DEFAULT);
-
-	lv_obj_t* back = lv_button_create(header);
-	lv_obj_set_size(back, 100, 50);
-	lv_obj_set_pos(back, 10, 17);
-	lv_obj_set_style_bg_opa(back, LV_OPA_TRANSP,
-							  LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_bg_color(back, lv_color_hex(0x2a3036),
-							  LV_PART_MAIN | LV_STATE_PRESSED);
-	lv_obj_set_style_bg_opa(back, LV_OPA_40,
-							LV_PART_MAIN | LV_STATE_PRESSED);
-	lv_obj_set_style_border_width(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_radius(back, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_pad_all(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_shadow_width(back, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_add_event_cb(back, _on_display_close, LV_EVENT_CLICKED, NULL);
-	lv_obj_t* back_label = lv_label_create(back);
-	lv_label_set_text(back_label, LV_SYMBOL_LEFT " Back");
-	lv_obj_set_style_text_color(back_label, lv_color_hex(0xe7ecef),
-								LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_center(back_label);
-
-	lv_obj_t* title = lv_label_create(header);
-	lv_label_set_text(title, "Display");
-	lv_obj_set_style_text_color(title, lv_color_white(),
-								LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_align(title, LV_ALIGN_BOTTOM_MID);
+	s_display_modal = ui_modal_create();
+	ui_modal_header(s_display_modal, "Display", _on_display_close, NULL);
 
 	lv_obj_t* brightness_panel = lv_obj_create(s_display_modal);
 	lv_obj_set_size(brightness_panel, 400, 100);
 	lv_obj_set_pos(brightness_panel, 40, 150);
-	lv_obj_remove_flag(brightness_panel, LV_OBJ_FLAG_SCROLLABLE);
+	ui_apply_card(brightness_panel);
 
 	lv_obj_t* brightness_title = lv_label_create(brightness_panel);
 	lv_label_set_text(brightness_title, "Brightness");
@@ -187,7 +143,7 @@ static void _ensure_display_modal(void) {
 	lv_obj_set_y(s_brightness_cfg, 10);
 	lv_obj_set_style_bg_color(s_brightness_cfg, lv_color_hex(0x363636),
 							  LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_bg_color(s_brightness_cfg, lv_color_hex(0x529D53),
+	lv_obj_set_style_bg_color(s_brightness_cfg, UI_COLOR_GREEN,
 							  LV_PART_INDICATOR | LV_STATE_DEFAULT);
 	lv_obj_set_style_bg_color(s_brightness_cfg, lv_color_white(),
 							  LV_PART_KNOB | LV_STATE_DEFAULT);
@@ -207,7 +163,7 @@ static void _ensure_display_modal(void) {
 	lv_obj_t* sleep_panel = lv_obj_create(s_display_modal);
 	lv_obj_set_size(sleep_panel, 400, 50);
 	lv_obj_set_pos(sleep_panel, 40, 270);
-	lv_obj_remove_flag(sleep_panel, LV_OBJ_FLAG_SCROLLABLE);
+	ui_apply_card(sleep_panel);
 
 	lv_obj_t* sleep_title = lv_label_create(sleep_panel);
 	lv_label_set_text(sleep_title, "Sleep Mode");
@@ -218,7 +174,7 @@ static void _ensure_display_modal(void) {
 	lv_obj_set_align(s_sleep_mode_cfg, LV_ALIGN_RIGHT_MID);
 	lv_obj_set_style_bg_color(s_sleep_mode_cfg, lv_color_hex(0x363636),
 							  LV_PART_MAIN | LV_STATE_DEFAULT);
-	lv_obj_set_style_bg_color(s_sleep_mode_cfg, lv_color_hex(0x529D53),
+	lv_obj_set_style_bg_color(s_sleep_mode_cfg, UI_COLOR_GREEN,
 							  LV_PART_INDICATOR | LV_STATE_CHECKED);
 	lv_obj_add_event_cb(s_sleep_mode_cfg, _on_sleep_mode_changed,
 						LV_EVENT_VALUE_CHANGED, NULL);
@@ -226,7 +182,7 @@ static void _ensure_display_modal(void) {
 	s_sleep_mode_time_panel = lv_obj_create(s_display_modal);
 	lv_obj_set_size(s_sleep_mode_time_panel, 400, 50);
 	lv_obj_set_pos(s_sleep_mode_time_panel, 40, 335);
-	lv_obj_remove_flag(s_sleep_mode_time_panel, LV_OBJ_FLAG_SCROLLABLE);
+	ui_apply_card(s_sleep_mode_time_panel);
 
 	lv_obj_t* after_label = lv_label_create(s_sleep_mode_time_panel);
 	lv_label_set_text(after_label, "After");
@@ -312,6 +268,7 @@ static void _show_display_modal(void) {
 	_apply_display_cfg_to_widgets(&cfg);
 	lv_obj_remove_flag(s_display_modal, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_move_foreground(s_display_modal);
+	ui_modal_anim_in(s_display_modal);
 }
 
 // static void _brighness_cfg_event_cb(lv_event_t * e)

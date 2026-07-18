@@ -3,6 +3,8 @@
 #include "wifi_connect_screen.h"
 #include "view_data.h"
 #include "esp_log.h"
+#include "ui_components.h"
+#include "ui_theme.h"
 
 /* Re-declare only what this component needs from the asset set. */
 LV_FONT_DECLARE(ui_font_font0);
@@ -95,12 +97,12 @@ static void _on_password_changed(lv_event_t *e) {
         s->password_ready = true;
         lv_obj_add_flag(s->join_btn, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_style_text_color(lv_obj_get_child(s->join_btn, 0),
-                                    lv_color_hex(0x529d53), LV_PART_MAIN | LV_STATE_DEFAULT);
+                                    UI_COLOR_GREEN, LV_PART_MAIN | LV_STATE_DEFAULT);
     } else if(!valid && s->password_ready) {
         s->password_ready = false;
         lv_obj_remove_flag(s->join_btn, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_style_text_color(lv_obj_get_child(s->join_btn, 0),
-                                    lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+                                    UI_COLOR_TEXT, LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }
 
@@ -146,13 +148,13 @@ wifi_connect_screen_t *wifi_connect_screen_show(const char *ssid, bool have_pass
     s->container = lv_obj_create(lv_layer_top());
     lv_obj_set_size(s->container, 420, 420);
     lv_obj_set_align(s->container, LV_ALIGN_CENTER);
-    lv_obj_remove_flag(s->container, LV_OBJ_FLAG_SCROLLABLE);
+    ui_apply_card(s->container);
 
     /* Cancel button */
     lv_obj_t *cancel_btn = lv_button_create(s->container);
     lv_obj_set_size(cancel_btn, 100, 50);
     lv_obj_set_align(cancel_btn, LV_ALIGN_TOP_LEFT);
-    lv_obj_set_style_bg_color(cancel_btn, lv_color_hex(0x292831), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(cancel_btn, UI_COLOR_SURFACE_PRESSED, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(cancel_btn, _on_cancel, LV_EVENT_CLICKED, s);
     lv_obj_t *cancel_label = lv_label_create(cancel_btn);
     lv_label_set_text(cancel_label, "Cancel");
@@ -162,7 +164,7 @@ wifi_connect_screen_t *wifi_connect_screen_show(const char *ssid, bool have_pass
     s->join_btn = lv_button_create(s->container);
     lv_obj_set_size(s->join_btn, 70, 50);
     lv_obj_set_align(s->join_btn, LV_ALIGN_TOP_RIGHT);
-    lv_obj_set_style_bg_color(s->join_btn, lv_color_hex(0x292831), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(s->join_btn, UI_COLOR_SURFACE_PRESSED, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(s->join_btn, _on_join, LV_EVENT_CLICKED, s);
     lv_obj_t *join_label = lv_label_create(s->join_btn);
     lv_label_set_text(join_label, "Join");
@@ -202,7 +204,7 @@ wifi_connect_screen_t *wifi_connect_screen_show(const char *ssid, bool have_pass
         lv_keyboard_set_popovers(s->kb, true);
         lv_obj_add_event_cb(s->kb, _on_keyboard_ready, LV_EVENT_READY, s);
     } else {
-        lv_obj_set_style_text_color(join_label, lv_color_hex(0x529d53),
+        lv_obj_set_style_text_color(join_label, UI_COLOR_GREEN,
                                     LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 
@@ -222,30 +224,30 @@ wifi_connect_screen_t *wifi_details_screen_show(const char *ssid) {
     s->container = lv_obj_create(lv_layer_top());
     lv_obj_set_size(s->container, 300, 200);
     lv_obj_set_align(s->container, LV_ALIGN_CENTER);
-    lv_obj_remove_flag(s->container, LV_OBJ_FLAG_SCROLLABLE);
+    ui_apply_card(s->container);
 
     /* Cancel */
     lv_obj_t *cancel_btn = lv_button_create(s->container);
     lv_obj_set_size(cancel_btn, 100, 50);
     lv_obj_set_align(cancel_btn, LV_ALIGN_BOTTOM_RIGHT);
-    lv_obj_set_style_bg_color(cancel_btn, lv_color_hex(0x292831), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(cancel_btn, UI_COLOR_SURFACE_PRESSED, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(cancel_btn, _on_cancel, LV_EVENT_CLICKED, s);
     lv_obj_t *cancel_label = lv_label_create(cancel_btn);
     lv_label_set_text(cancel_label, "Cancel");
     lv_obj_set_style_text_font(cancel_label, &ui_font_font0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(cancel_label, lv_color_hex(0x529d53),
+    lv_obj_set_style_text_color(cancel_label, UI_COLOR_GREEN,
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
 
     /* Delete */
     lv_obj_t *delete_btn = lv_button_create(s->container);
     lv_obj_set_size(delete_btn, 100, 50);
     lv_obj_set_align(delete_btn, LV_ALIGN_BOTTOM_LEFT);
-    lv_obj_set_style_bg_color(delete_btn, lv_color_hex(0x292831), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(delete_btn, UI_COLOR_SURFACE_PRESSED, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(delete_btn, _on_delete, LV_EVENT_CLICKED, s);
     lv_obj_t *delete_label = lv_label_create(delete_btn);
     lv_label_set_text(delete_label, "Delete");
     lv_obj_set_style_text_font(delete_label, &ui_font_font0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(delete_label, lv_color_hex(0xff0000),
+    lv_obj_set_style_text_color(delete_label, UI_COLOR_RED,
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
 
     /* SSID label */

@@ -2,6 +2,8 @@
 #include <string.h>
 #include "wifi_list_screen.h"
 #include "indicator_util.h"
+#include "ui_components.h"
+#include "ui_theme.h"
 
 /* Re-declare only the image assets this component needs — avoids pulling
  * in the old generated-UI namespace. */
@@ -23,13 +25,13 @@ static void _rebuild_list(wifi_list_screen_t *s) {
         lv_obj_delete(s->list);
     }
     s->list = lv_list_create(s->parent);
-    lv_obj_set_style_pad_row(s->list, 8, 0);
+    lv_obj_set_style_pad_row(s->list, UI_SPACE_SM, 0);
     lv_obj_set_align(s->list, LV_ALIGN_CENTER);
     lv_obj_set_size(s->list, 420, 330);
     lv_obj_set_pos(s->list, 0, 35);
-    lv_obj_set_style_bg_color(s->list, lv_color_hex(0x101418), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_grad_color(s->list, lv_color_hex(0x101418), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(s->list, lv_color_hex(0x101418), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(s->list, UI_COLOR_BG, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_color(s->list, UI_COLOR_BG, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(s->list, UI_COLOR_BG, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
 static void _add_item(wifi_list_screen_t *s, const char *ssid,
@@ -37,14 +39,16 @@ static void _add_item(wifi_list_screen_t *s, const char *ssid,
     lv_obj_t *btn = lv_button_create(s->list);
     lv_obj_set_size(btn, 380, 50);
     lv_obj_set_align(btn, LV_ALIGN_CENTER);
+    lv_obj_set_style_radius(btn, UI_RADIUS_BUTTON, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     if(is_connect) {
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x529d53), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(btn, UI_COLOR_GREEN, LV_PART_MAIN | LV_STATE_DEFAULT);
         if(s->on_connected_tap) {
             lv_obj_add_event_cb(btn, s->on_connected_tap, LV_EVENT_CLICKED, NULL);
         }
     } else {
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x2c2c2c), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(btn, UI_COLOR_SURFACE, LV_PART_MAIN | LV_STATE_DEFAULT);
+        ui_make_pressable(btn);
         if(s->on_unconnected_tap) {
             lv_obj_add_event_cb(btn, s->on_unconnected_tap, LV_EVENT_CLICKED, NULL);
         }

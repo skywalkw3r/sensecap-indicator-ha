@@ -4,6 +4,8 @@
 #include "home_assistant_config.h"
 #include "lv_port.h"
 #include "nav.h"
+#include "ui_components.h"
+#include "ui_theme.h"
 #include "view_data.h"
 
 #include <stdbool.h>
@@ -12,19 +14,16 @@
 
 #define SWITCH_SLOT_COUNT 8
 
-#define TILE_WIDTH 480
-#define HEADER_HEIGHT 85
-
 #define CARD_WIDTH 214
 #define CARD_HEIGHT 164
 #define ROW_HEIGHT 78
-#define CARD_RADIUS 12
-#define CARD_BG 0x282828
-#define CARD_BG_CHECKED 0x292829
-#define TEXT_MUTED 0x9E9E9E
-#define SWITCH_GREEN 0x529D53
-#define SWITCH_TRACK 0x4F4F4F
-#define ARC_TRACK 0x1C1C1C
+/* Colour + radius come from the shared design tokens (ui_theme.h). Only the
+ * numeric card geometry and the two lv_switch/lv_slider track colours (widget
+ * parts, not surfaces) stay local. */
+#define TEXT_MUTED   UI_HEX_TEXT_MUTED
+#define SWITCH_GREEN UI_HEX_GREEN
+#define SWITCH_TRACK 0x4F4F4F   /* lv_switch off-track */
+#define ARC_TRACK    0x1C1C1C   /* lv_slider groove */
 
 LV_IMAGE_DECLARE(ui_img_ic_temp_png);
 LV_IMAGE_DECLARE(ui_img_ic_hum_png);
@@ -165,46 +164,22 @@ static void _style_panel(lv_obj_t *obj, int32_t width, int32_t height, int32_t x
 {
     lv_obj_set_size(obj, width, height);
     lv_obj_set_pos(obj, x, y);
-    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(obj, CARD_RADIUS, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(obj, lv_color_hex(CARD_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    ui_apply_card(obj);
 }
 
 static void _style_checkable_card(lv_obj_t *btn, int32_t width, int32_t height, int32_t x, int32_t y)
 {
     _style_panel(btn, width, height, x, y);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE | LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    lv_obj_set_style_bg_color(btn, lv_color_hex(CARD_BG_CHECKED), LV_PART_MAIN | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_CHECKED);
+    /* Animated press + checked feedback: green "on" hairline (see ui_theme). */
+    ui_make_checkable(btn, UI_COLOR_GREEN);
 }
 
+/* Thin adapter over ui_label so the existing call sites keep passing a plain
+ * 24-bit hex colour. */
 static lv_obj_t *_create_label(lv_obj_t *parent, const char *text, const lv_font_t *font, uint32_t color)
 {
-    lv_obj_t *label = lv_label_create(parent);
-    lv_label_set_text(label, text);
-    lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(label, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(label, font, LV_PART_MAIN | LV_STATE_DEFAULT);
-    return label;
-}
-
-static void _create_header(lv_obj_t *tile, const char *title)
-{
-    lv_obj_t *header = lv_obj_create(tile);
-    lv_obj_set_size(header, TILE_WIDTH, HEADER_HEIGHT);
-    lv_obj_set_pos(header, 0, 0);
-    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_all(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    /* montserrat, not the custom font0: font0's subset doesn't cover these
-     * titles reliably (rendered blank in the simulator). */
-    lv_obj_t *label = _create_label(header, title, &lv_font_montserrat_24, 0xFFFFFF);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_center(label);
+    return ui_label(parent, text, font, lv_color_hex(color));
 }
 
 static lv_obj_t *_create_row_toggle(lv_obj_t *tile, switch_slot_t *slot, int32_t x, int32_t y,
@@ -240,7 +215,7 @@ static lv_obj_t *_create_embedded_switch(lv_obj_t *tile, switch_slot_t *slot, in
     lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
     lv_obj_remove_flag(card, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE);
 
-    lv_obj_t *glyph = _create_label(card, LV_SYMBOL_CHARGE, &lv_font_montserrat_18, 0xECBF41);
+    lv_obj_t *glyph = _create_label(card, LV_SYMBOL_CHARGE, &lv_font_montserrat_18, UI_HEX_AMBER);
     lv_obj_set_pos(glyph, 16, 22);
 
     lv_obj_t *label = _create_label(card, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
@@ -269,7 +244,7 @@ static lv_obj_t *_create_embedded_switch(lv_obj_t *tile, switch_slot_t *slot, in
  * Tap → confirm modal → publish switch4:1, then 0 after a short pulse so the
  * Home Assistant automation always sees a fresh off→on edge to trigger on. */
 
-#define ALL_LIGHTS_ACCENT   0xD9534F
+#define ALL_LIGHTS_ACCENT   UI_HEX_RED
 #define ALL_LIGHTS_PULSE_MS 1200
 
 static lv_obj_t *s_confirm_mbox;
@@ -312,16 +287,21 @@ static void _all_lights_click_cb(lv_event_t *e)
 
     lv_obj_t *mbox = lv_msgbox_create(NULL);
     s_confirm_mbox = mbox;
-    lv_obj_set_style_text_font(mbox, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(mbox, UI_FONT_LABEL, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(mbox, UI_COLOR_SURFACE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(mbox, UI_RADIUS_CARD, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_msgbox_add_title(mbox, "All Lights");
     lv_msgbox_add_text(mbox, "Turn off all lights?");
 
     lv_obj_t *ok = lv_msgbox_add_footer_button(mbox, "Turn Off");
-    lv_obj_set_style_bg_color(ok, lv_color_hex(ALL_LIGHTS_ACCENT), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(ok, UI_COLOR_RED, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(ok, _all_lights_confirm_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *cancel = lv_msgbox_add_footer_button(mbox, "Cancel");
     lv_obj_add_event_cb(cancel, _all_lights_cancel_cb, LV_EVENT_CLICKED, NULL);
+
+    /* Subtle fade + rise as the confirm dialog appears (~250 ms ease-out). */
+    ui_modal_anim_in(mbox);
 }
 
 static void _create_all_lights_card(lv_obj_t *tile, switch_slot_t *slot, int32_t x, int32_t y)
@@ -329,6 +309,7 @@ static void _create_all_lights_card(lv_obj_t *tile, switch_slot_t *slot, int32_t
     lv_obj_t *btn = lv_button_create(tile);
     _style_panel(btn, CARD_WIDTH, CARD_HEIGHT, x, y);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    ui_make_pressable(btn);
 
     lv_obj_t *glyph = _create_label(btn, LV_SYMBOL_POWER, &lv_font_montserrat_48, ALL_LIGHTS_ACCENT);
     lv_obj_set_align(glyph, LV_ALIGN_CENTER);
@@ -348,7 +329,7 @@ static void _create_all_lights_card(lv_obj_t *tile, switch_slot_t *slot, int32_t
  * (see ha_sensor.c); never posts to the switch protocol.
  * Index contract: 0=temp 1=humidity 2=co2. */
 
-#define HUMIDITY_ACCENT 0x52AAE5
+#define HUMIDITY_ACCENT UI_HEX_BLUE
 
 static lv_obj_t *s_ha_display_value[CONFIG_HA_DISPLAY_VALUE_NUM];
 
@@ -389,11 +370,11 @@ static void _create_loft_temp_card(lv_obj_t *tile, switch_slot_t *slot)
 
     /* montserrat_48, not the custom font2: font2 is a numerals-only subset
      * and silently renders nothing for the "--" placeholder. */
-    s_ha_display_value[0] = _create_label(card, "--", &lv_font_montserrat_48, 0xECBF41);
+    s_ha_display_value[0] = _create_label(card, "--", &lv_font_montserrat_48, UI_HEX_AMBER);
     lv_obj_set_align(s_ha_display_value[0], LV_ALIGN_CENTER);
     lv_obj_set_pos(s_ha_display_value[0], -14, -20);
 
-    lv_obj_t *unit = _create_label(card, CONFIG_HA_TEMP_UI_UNIT, &lv_font_montserrat_24, 0xECBF41);
+    lv_obj_t *unit = _create_label(card, CONFIG_HA_TEMP_UI_UNIT, &lv_font_montserrat_24, UI_HEX_AMBER);
     lv_obj_set_align(unit, LV_ALIGN_CENTER);
     lv_obj_set_pos(unit, 78, -30);
 
@@ -484,7 +465,7 @@ static void _init_slots(ha_switch_screen_t *s)
 
 static void _create_general_tile(ha_switch_screen_t *s, lv_obj_t *tile)
 {
-    _create_header(tile, "General Controls");
+    ui_header(tile, "General Controls");
 
     _create_all_lights_card(tile, &s->slots[3], 22, 96);
     /* Vertically centered beside the taller All Lights card. */
@@ -496,13 +477,13 @@ static void _create_general_tile(ha_switch_screen_t *s, lv_obj_t *tile)
 
 static void _create_ctrl_tile(ha_switch_screen_t *s, lv_obj_t *tile)
 {
-    _create_header(tile, "Loft Controls");
+    ui_header(tile, "Loft Controls");
 
     _create_loft_temp_card(tile, &s->slots[4]);
     /* Right column: two half-height stat rows aligned with the temp card
      * (96..174 and 182..260 vs the card's 96..260). */
     _create_stat_row(tile, 96, CONFIG_HA_HUMIDITY_UI_NAME, &ui_img_ic_hum_png, HUMIDITY_ACCENT, 1);
-    _create_stat_row(tile, 182, CONFIG_HA_CO2_UI_NAME, &ui_img_ic_co2_png, 0xFFFFFF, 2);
+    _create_stat_row(tile, 182, CONFIG_HA_CO2_UI_NAME, &ui_img_ic_co2_png, UI_HEX_TEXT, 2);
     _create_embedded_switch(tile, &s->slots[6], 22, 268, 60, 28);
     _create_slider_card(tile, &s->slots[7]);
 }
