@@ -26,6 +26,9 @@
 #define SWITCH_TRACK 0x4F4F4F
 #define ARC_TRACK 0x1C1C1C
 
+LV_IMAGE_DECLARE(ui_img_ic_temp_png);
+LV_IMAGE_DECLARE(ui_img_ic_hum_png);
+LV_IMAGE_DECLARE(ui_img_ic_co2_png);
 LV_IMAGE_DECLARE(ui_img_ic_switch1_on_png);
 LV_IMAGE_DECLARE(ui_img_ic_switch1_off_png);
 LV_FONT_DECLARE(ui_font_font0);
@@ -237,12 +240,15 @@ static lv_obj_t *_create_embedded_switch(lv_obj_t *tile, switch_slot_t *slot, in
     lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
     lv_obj_remove_flag(card, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE);
 
+    lv_obj_t *glyph = _create_label(card, LV_SYMBOL_CHARGE, &lv_font_montserrat_18, 0xECBF41);
+    lv_obj_set_pos(glyph, 16, 22);
+
     lv_obj_t *label = _create_label(card, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
-    lv_obj_set_pos(label, 16, 22);
+    lv_obj_set_pos(label, 40, 22);
 
     lv_obj_t *toggle = lv_switch_create(card);
     lv_obj_set_size(toggle, switch_width, switch_height);
-    lv_obj_set_pos(toggle, 115, 20);
+    lv_obj_set_pos(toggle, 140, 20);
     lv_obj_add_state(toggle, LV_STATE_CHECKED);
     lv_obj_set_style_radius(toggle, 40, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_radius(toggle, 40, LV_PART_INDICATOR | LV_STATE_DEFAULT);
@@ -377,6 +383,10 @@ static void _create_loft_temp_card(lv_obj_t *tile, switch_slot_t *slot)
     lv_obj_t *card = lv_obj_create(tile);
     _style_panel(card, CARD_WIDTH, CARD_HEIGHT, 22, 96);
 
+    lv_obj_t *icon = lv_image_create(card);
+    lv_image_set_src(icon, &ui_img_ic_temp_png);
+    lv_obj_set_pos(icon, 6, 2);
+
     /* montserrat_48, not the custom font2: font2 is a numerals-only subset
      * and silently renders nothing for the "--" placeholder. */
     s_ha_display_value[0] = _create_label(card, "--", &lv_font_montserrat_48, 0xECBF41);
@@ -401,20 +411,29 @@ static void _create_loft_temp_card(lv_obj_t *tile, switch_slot_t *slot)
  * Two of these stacked with an 8 px gap equal one CARD_HEIGHT, aligning the
  * right column with the temperature card. */
 static void _create_stat_row(lv_obj_t *tile, int32_t y, const char *name_text,
-                             uint32_t accent, int value_idx)
+                             const lv_image_dsc_t *icon_src, uint32_t accent, int value_idx)
 {
     lv_obj_t *card = lv_obj_create(tile);
     _style_panel(card, CARD_WIDTH, ROW_HEIGHT, 244, y);
+    /* The default theme padding leaves ~50 px of content in a 78 px row —
+     * not enough for two stacked labels. Use the full height. */
+    lv_obj_set_style_pad_all(card, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_t *name = _create_label(card, name_text, &lv_font_montserrat_18, TEXT_MUTED);
-    lv_obj_set_align(name, LV_ALIGN_LEFT_MID);
-    lv_obj_set_x(name, 16);
+    lv_obj_t *icon = lv_image_create(card);
+    lv_image_set_src(icon, icon_src);
+    lv_obj_set_align(icon, LV_ALIGN_LEFT_MID);
+    lv_obj_set_x(icon, 12);
 
     char placeholder[48];
     lv_snprintf(placeholder, sizeof(placeholder), "-- %s", display_units[value_idx]);
     s_ha_display_value[value_idx] = _create_label(card, placeholder, &lv_font_montserrat_24, accent);
-    lv_obj_set_align(s_ha_display_value[value_idx], LV_ALIGN_RIGHT_MID);
-    lv_obj_set_x(s_ha_display_value[value_idx], -16);
+    lv_obj_set_align(s_ha_display_value[value_idx], LV_ALIGN_TOP_MID);
+    lv_obj_set_pos(s_ha_display_value[value_idx], 22, 10);
+
+    /* Bottom-centered name, matching the temperature card's label style. */
+    lv_obj_t *name = _create_label(card, name_text, &lv_font_montserrat_18, TEXT_MUTED);
+    lv_obj_set_align(name, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_pos(name, 22, -6);
 }
 
 static void _create_slider_card(lv_obj_t *tile, switch_slot_t *slot)
@@ -427,13 +446,20 @@ static void _create_slider_card(lv_obj_t *tile, switch_slot_t *slot)
     lv_obj_t *label = _create_label(card, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
     lv_obj_set_align(label, LV_ALIGN_BOTTOM_MID);
 
+    lv_obj_t *dim = _create_label(card, LV_SYMBOL_MINUS, &lv_font_montserrat_18, TEXT_MUTED);
+    lv_obj_set_pos(dim, 16, 14);
+
+    lv_obj_t *bright = _create_label(card, LV_SYMBOL_PLUS, &lv_font_montserrat_18, TEXT_MUTED);
+    lv_obj_set_align(bright, LV_ALIGN_TOP_RIGHT);
+    lv_obj_set_pos(bright, -16, 14);
+
     lv_obj_t *slider = lv_slider_create(card);
     lv_slider_set_value(slider, 80, LV_ANIM_OFF);
     if (lv_slider_get_mode(slider) == LV_SLIDER_MODE_RANGE) {
         lv_slider_set_left_value(slider, 0, LV_ANIM_OFF);
     }
-    lv_obj_set_size(slider, 385, 20);
-    lv_obj_set_pos(slider, 12, 12);
+    lv_obj_set_size(slider, 330, 20);
+    lv_obj_set_pos(slider, 50, 12);
     lv_obj_set_style_radius(slider, 15, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(slider, lv_color_hex(ARC_TRACK), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -475,8 +501,8 @@ static void _create_ctrl_tile(ha_switch_screen_t *s, lv_obj_t *tile)
     _create_loft_temp_card(tile, &s->slots[4]);
     /* Right column: two half-height stat rows aligned with the temp card
      * (96..174 and 182..260 vs the card's 96..260). */
-    _create_stat_row(tile, 96, CONFIG_HA_HUMIDITY_UI_NAME, HUMIDITY_ACCENT, 1);
-    _create_stat_row(tile, 182, CONFIG_HA_CO2_UI_NAME, 0xFFFFFF, 2);
+    _create_stat_row(tile, 96, CONFIG_HA_HUMIDITY_UI_NAME, &ui_img_ic_hum_png, HUMIDITY_ACCENT, 1);
+    _create_stat_row(tile, 182, CONFIG_HA_CO2_UI_NAME, &ui_img_ic_co2_png, 0xFFFFFF, 2);
     _create_embedded_switch(tile, &s->slots[6], 22, 268, 60, 28);
     _create_slider_card(tile, &s->slots[7]);
 }
