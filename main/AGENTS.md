@@ -25,6 +25,7 @@ main/
   storage/      NVS 读写
   cmd/          UART 控制台命令
   nav/          lv_tileview 导航（主屏滑动）
+  ui/           共享设计系统：设计令牌 + 主题安装（ui_theme），可复用卡片/标签/标题/弹窗构造器与动效（ui_components）
   assets/       图像和字体资源（LVGL 9 格式）
   util/         公共工具函数
 
@@ -53,13 +54,13 @@ main/assets/    ui_img_*.c, ui_font_*.c（图像/字体资源）
 
 ## 导航系统
 
-主屏使用 `lv_tileview`，横向滑动，当前 3 个 tile：
+主屏使用 `lv_tileview`，横向滑动，当前 3 个 tile（传感器数据页已移除：D1 无板载环境传感器，只会显示 N/A）：
 
 ```c
-// main/nav/nav.h
-#define NAV_TILE_HA_DATA  0   // 传感器数据页
-#define NAV_TILE_HA_CTRL  1   // HA 开关控制页
-#define NAV_TILE_HA_MIX   2   // HA 混合控件页（弧形/滑块）
+// main/nav/nav.h  ← 以此为准
+#define NAV_TILE_HA_CTRL  0   // Loft Controls（主页）：温度/湿度/CO2 + LED Strip
+#define NAV_TILE_HA_MIX   1   // General Controls：All Lights + Xmas Lights
+#define NAV_TILE_HA_TREND 2   // Trends：温度/湿度/CO2 历史折线图（lv_chart）
 #define NAV_TILE_COUNT    3
 ```
 

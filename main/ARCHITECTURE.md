@@ -16,10 +16,11 @@ main/
   view_data_types.h       Pure data types used by the event contract.
   lv_port.c               LVGL display/touch port. Owns lv_port_sem_take/give for LVGL thread safety.
 
-  nav/                    lv_tileview navigation for the main swipeable screens.
+  nav/                    lv_tileview navigation for the main swipeable screens. Three tiles: NAV_TILE_HA_CTRL (Loft Controls), NAV_TILE_HA_MIX (General Controls), NAV_TILE_HA_TREND (Trends chart).
+  ui/                     Shared design system: tokens + theme install (ui_theme) and reusable card/label/header/modal constructors with pressed/checked + modal motion (ui_components).
   assets/                 LVGL 9 image/font descriptors used by handwritten screen components.
 
-  ha/                     Home Assistant domain: broker config, MQTT lifecycle, sensors, switches, screen widgets.
+  ha/                     Home Assistant domain: broker config, MQTT lifecycle, sensors, switches, screen widgets, sensor-history model (ha_history) + trends chart (ha_trend_screen).
   wifi/                   Wi-Fi domain: scanning, connection state, list/connect modals, status icon.
   sensor/                 Built-in sensor cache/parser and sensor data view.
   display/                LCD backlight, sleep mode, and display settings view.
@@ -71,7 +72,7 @@ View initialization runs before model initialization in the current code. Screen
 | `ha_cfg_event_handle` | `HA_CFG_EVENT_BASE` | `ha/ha_mqtt.c` | HA broker config changes |
 | default event loop | `WIFI_EVENT`, `IP_EVENT` | `wifi/wifi_model.c` | ESP-IDF Wi-Fi driver events |
 
-The event manifest lives in `view_data.h` / `view_data_types.h`. When changing an event payload, update all listed producers and consumers together.
+The event manifest lives in `view_data.h` / `view_data_types.h`. When changing an event payload, update all listed producers and consumers together. Example flow: HA pushes display values on `indicator/display/set` → `VIEW_EVENT_HA_SENSOR` updates the Loft cards and feeds `ha_history`, which re-publishes per-series `VIEW_EVENT_HA_HISTORY` snapshots consumed by the Trends chart.
 
 ---
 
@@ -91,6 +92,7 @@ Allowed LVGL ownership is intentionally narrow:
 |------|-------------|
 | `lv_port.[ch]` | Display/touch port and LVGL lock |
 | `nav/nav.[ch]` | Tileview/page-root containers |
+| `ui/ui_theme.*`, `ui/ui_components.*` | Shared presentation infrastructure: design tokens, theme install, reusable card/label/header/modal constructors + motion (no domain state) |
 | `*_view.c` and `*_screen.c` files | Domain widgets and callbacks |
 | model/controller files | No LVGL object ownership |
 

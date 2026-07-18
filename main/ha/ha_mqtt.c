@@ -227,6 +227,9 @@ int indicator_ha_model_init(void)
 {
     ha_sensor_init();
     ha_switch_init();
+    /* History model: buffers the HA-pushed display values and feeds the trends
+     * chart over VIEW_EVENT_HA_HISTORY. Pure model, wired next to the switch. */
+    ha_history_init();
 
     esp_event_loop_args_t ha_event_task_args = {
         .queue_size = 5,
@@ -261,5 +264,8 @@ int indicator_ha_view_init(void)
     ha_config_view_init();
     ha_switch_screen_t *screen = ha_switch_screen_create();
     ha_switch_attach_screen(screen);
+    /* Trends tile (NAV_TILE_HA_TREND). HA domain owns the view; indicator_view.c
+     * reaches it through this aggregator, the same path as the switch screen. */
+    ha_trend_screen_init();
     return ESP_OK;
 }

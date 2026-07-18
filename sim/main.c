@@ -21,6 +21,8 @@
 #include "settings/settings_view.h"
 #include "wifi/wifi_view.h"
 #include "ha/ha_switch_screen.h"
+#include "ha/ha_trend_screen.h"
+#include "ha/ha_history.h"
 
 #include "mock/mock_sensors.h"
 
@@ -41,7 +43,12 @@ int main(void) {
     view_sensor_init();
     indicator_wifi_view_init();
     ha_switch_screen_create();
+    ha_trend_screen_init();
     settings_view_init();
+
+    /* HA history model (registers the VIEW_EVENT_HA_SENSOR → VIEW_EVENT_HA_HISTORY
+     * handler). Must run before the mock seeds so early samples are captured. */
+    ha_history_init();
 
     const char *open_settings = getenv("SIM_OPEN_SETTINGS");
     if (open_settings && *open_settings) {

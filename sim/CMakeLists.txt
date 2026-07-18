@@ -14,7 +14,7 @@ pkg_check_modules(SDL2 REQUIRED sdl2)
 include(FetchContent)
 FetchContent_Declare(lvgl
     GIT_REPOSITORY https://github.com/lvgl/lvgl.git
-    GIT_TAG        v9.2.2
+    GIT_TAG        v9.5.0
     GIT_SHALLOW    TRUE
 )
 # Must be set before FetchContent_MakeAvailable so LVGL's CMake picks it up
@@ -52,11 +52,15 @@ set(STUB_SOURCES
 file(GLOB ASSET_SOURCES "${FW_ROOT}/main/assets/*.c")
 
 set(UI_SOURCES
+    ${FW_ROOT}/main/ui/ui_theme.c
+    ${FW_ROOT}/main/ui/ui_components.c
     ${FW_ROOT}/main/nav/nav.c
     ${FW_ROOT}/main/display/display_view.c
     ${FW_ROOT}/main/settings/settings_view.c
     ${FW_ROOT}/main/sensor/sensor_view.c
     ${FW_ROOT}/main/ha/ha_switch_screen.c
+    ${FW_ROOT}/main/ha/ha_history.c
+    ${FW_ROOT}/main/ha/ha_trend_screen.c
     ${FW_ROOT}/main/wifi/wifi_connect_screen.c
     ${FW_ROOT}/main/wifi/wifi_list_screen.c
     ${FW_ROOT}/main/wifi/wifi_view.c
@@ -87,6 +91,7 @@ target_include_directories(sensecap_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     # 3. Firmware source tree — view_data_types.h, home_assistant_config.h, etc.
     ${FW_ROOT}/main
+    ${FW_ROOT}/main/ui
     ${FW_ROOT}/main/nav
     ${FW_ROOT}/main/ha
     ${FW_ROOT}/main/sensor

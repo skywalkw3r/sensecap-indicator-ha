@@ -135,6 +135,21 @@ struct view_data_ha_switch_data {
     int     value;
 };
 
+/* Sensor-history window. Sized to the trends chart's on-screen point budget;
+ * shared by the ha_history ring buffer and the VIEW_EVENT_HA_HISTORY payload. */
+#define HA_HISTORY_MAX_SAMPLES 120
+
+/* One-series history snapshot posted with VIEW_EVENT_HA_HISTORY (see manifest).
+ * Fixed-size, pointer-free value type: esp_event copies it whole, so the chart
+ * consumer never dereferences the model's live ring buffer. `samples` runs
+ * oldest→newest; only the first `count` entries are valid. sizeof ≈ 484 B, well
+ * under the 1 KB per-post budget. One post per series keeps it that small. */
+struct view_data_ha_history {
+    uint8_t  index;                           /* series: 0=temp 1=humidity 2=co2 */
+    uint16_t count;                           /* valid samples (0..HA_HISTORY_MAX_SAMPLES) */
+    float    samples[HA_HISTORY_MAX_SAMPLES]; /* oldest→newest */
+};
+
 /* ── Event IDs (VIEW_EVENT_BASE) ─────────────────────────────────────────── */
 
 /*
@@ -204,9 +219,18 @@ enum {
     VIEW_EVENT_HA_ADDR_DISPLAY,
 
     /* P: ha/ha_sensor.c (HA→device values on indicator/display/set)
-     * C: ha/ha_switch.c (updates the Bedroom/Loft temp card, LVGL lock held)
+     * C: ha/ha_switch.c (updates the Loft temp card + stat rows, LVGL lock held);
+     *    ha/ha_history.c (appends the parsed float to its per-series ring buffer)
      * Payload: struct view_data_ha_sensor_data */
     VIEW_EVENT_HA_SENSOR,
+
+    /* P: ha/ha_history.c (per-series ring buffer; posts on each new sample)
+     * C: ha/ha_trend_screen.c (redraws the lv_chart line for that series)
+     * Payload: struct view_data_ha_history — one series per post, ~484 B value
+     * copy (esp_event copies it, so the model's live buffer is never aliased).
+     * LVGL: lock required — the consumer runs in the view_event task, not the
+     * LVGL task, so it must hold lv_port_sem_take/give around chart mutation. */
+    VIEW_EVENT_HA_HISTORY,
 
     /* P: ha/ha_switch_screen.c  C: ha/ha_switch.c  Payload: struct view_data_ha_switch_data */
     VIEW_EVENT_HA_SWITCH_ST,
