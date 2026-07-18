@@ -30,7 +30,7 @@ no extra deps).
 
 ## Notes
 
-- Run from the repo root (`/Users/spencer/conductor/repos/sensecap-indicator-ha`).
+- Run from the repo root.
 - An SDL window briefly opens (the LVGL SDL driver needs a registered display) and closes when the binary exits. Independent of focus — `lv_snapshot_take` reads the LVGL framebuffer, not the screen.
 - Output is always 480×480 ARGB8888 (matches the real hardware LCD).
 - To capture a different screen state, post events first (e.g. modify `sim/mock/mock_sensors.c` to inject specific values) and rebuild.

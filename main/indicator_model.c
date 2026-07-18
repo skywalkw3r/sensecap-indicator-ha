@@ -40,16 +40,5 @@ int indicator_model_init(void) {
 
 #endif
 
-#ifdef INDICATOR_LORAWAN_H
-	indicator_lorawan_init();
-	#ifdef CMD_H
-	indicator_cmd_init();
-	#endif
-#endif
-
-#ifdef INDICATOR_TERMINAL_H
-	indicator_terminal_init();
-#endif
-
 	return 0;
 }

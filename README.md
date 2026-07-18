@@ -2,12 +2,12 @@
 
 [![CI](https://github.com/skywalkw3r/sensecap-indicator-ha/actions/workflows/ci.yml/badge.svg)](https://github.com/skywalkw3r/sensecap-indicator-ha/actions/workflows/ci.yml)
 
-Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) into a Home Assistant companion panel. Connects to Wi-Fi, publishes built-in sensor data over MQTT, and renders on-screen controls that Home Assistant can drive both ways.
+Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) into a Home Assistant companion panel. Connects to Wi-Fi, renders touch controls that Home Assistant can drive both ways over MQTT, and displays HA-pushed values (temperature, humidity, CO₂) on screen. On sensor-equipped variants it also publishes the built-in sensor readings.
 
 <figure class="third">
-    <img align="left" src="./assets/Home Assistant Data.png" width="240"/>
-    <img align="center" src="./assets/Home Assistant.png" width="240"/>
-    <img align="left" src="./assets/Home Assistant Control(ON).png" width="240"/>
+    <img align="left" src="./assets/loft-controls.png" width="240"/>
+    <img align="center" src="./assets/general-controls.png" width="240"/>
+    <img align="left" src="./assets/trends.png" width="240"/>
     <img align="center" src="./assets/mqtt-address-panel.png" width="240"/>
 </figure>
 
@@ -32,8 +32,10 @@ Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudi
 ## Features
 
 - [x] MQTT broker integration (configurable address, port, client ID, username, password)
-- [x] Built-in sensor publishing: temperature, humidity, CO₂ (SCD41), tVOC (SGP40/SHT41)
-- [x] Home Assistant control widgets: 6 binary switches + 2 numeric sliders
+- [x] HA-pushed display values (`indicator/display/set`): temperature, humidity, CO₂ rendered on the panel
+- [x] Built-in sensor publishing on sensor-equipped variants (SCD41 CO₂, SGP40 tVOC, SHT41 temp/humidity) — the base D1 this fork targets has none, so that pipeline idles
+- [x] Three swipeable pages: Loft Controls (temp/humidity/CO₂ + LED strip + brightness), General Controls (All Lights with confirm, Xmas Lights), and a Trends history chart
+- [x] All 8 MQTT switch entities remain addressable (switch1–3 have no on-screen widget but keep their topics)
 - [x] Wi-Fi and MQTT configuration from the touchscreen
 - [x] MQTT broker configuration from the serial console (`setmqtt`, `mqtthelp`)
 - [x] NVS-backed persistence for Wi-Fi credentials, MQTT config, switch state
@@ -68,7 +70,7 @@ The SenseCAP Indicator is a dual-MCU device:
 | **ESP32-S3** | Display, touch, Wi-Fi, MQTT, Home Assistant logic | 8 MB flash, PSRAM @ 120 MHz OCT mode, 240 MHz CPU |
 | **RP2040** | Sensor acquisition on Grove ports | Reads CO₂, tVOC, temperature, humidity; relays to ESP32-S3 over UART |
 
-The two chips communicate over a COBS-framed UART link. All Grove sensor access goes through the RP2040; the ESP32-S3 never reads sensors directly.
+The two chips communicate over a COBS-framed UART link. All Grove sensor access goes through the RP2040; the ESP32-S3 never reads sensors directly. On the base D1 (no bundled Grove sensors) this link simply idles, and the on-screen temperature/humidity/CO₂ come from Home Assistant via `indicator/display/set` instead.
 
 ```
 ┌─────────────────────────────────────────────────────┐
