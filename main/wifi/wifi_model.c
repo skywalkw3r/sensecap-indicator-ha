@@ -79,19 +79,27 @@ static void _wifi_st_get(struct view_data_wifi_st* p_st) {
  * call this or the UI strands a spinner. Pass ap_count == 0 to publish a list
  * carrying only the current connection (used on the failure / guard paths). */
 static void _wifi_list_post(const wifi_ap_record_t* p_ap_info, uint16_t ap_count) {
-	struct view_data_wifi_list list;
 	struct view_data_wifi_st st;
 
-	memset(&list, 0, sizeof(struct view_data_wifi_list));
+	/* HEAP, not stack: callers run on the default event loop task (SCAN_DONE)
+	 * and the esp_timer task (scan guard), both with small stacks that cannot
+	 * hold the ~640-byte list payload. esp_event_post_to copies the payload,
+	 * so freeing after the post is safe. */
+	struct view_data_wifi_list* list = calloc(1, sizeof(struct view_data_wifi_list));
+	if(list == NULL)
+	{
+		ESP_LOGE(TAG, "no memory for wifi list payload");
+		return;
+	}
 
 	_wifi_st_get(&st);
 
-	list.is_connect = st.is_connected;
+	list->is_connect = st.is_connected;
 	if(st.is_connected)
 	{
-		strlcpy((char*)list.connect.ssid, (char*)st.ssid, sizeof(list.connect.ssid));
-		list.connect.auth_mode = false;
-		list.connect.rssi = st.rssi;
+		strlcpy((char*)list->connect.ssid, (char*)st.ssid, sizeof(list->connect.ssid));
+		list->connect.auth_mode = false;
+		list->connect.rssi = st.rssi;
 	}
 
 	bool is_exist = false;
@@ -101,7 +109,7 @@ static void _wifi_list_post(const wifi_ap_record_t* p_ap_info, uint16_t ap_count
 		is_exist = false;
 		for(int j = 0; j < list_cnt; j++)
 		{
-			if(strcmp(list.aps[j].ssid, (char*)p_ap_info[i].ssid) == 0)
+			if(strcmp(list->aps[j].ssid, (char*)p_ap_info[i].ssid) == 0)
 			{
 				ESP_LOGI(TAG, "list exit ap:%s", (char*)p_ap_info[i].ssid);
 				is_exist = true;
@@ -110,21 +118,22 @@ static void _wifi_list_post(const wifi_ap_record_t* p_ap_info, uint16_t ap_count
 		}
 		if(!is_exist)
 		{
-			strlcpy(list.aps[list_cnt].ssid, (char*)p_ap_info[i].ssid, sizeof(list.aps[list_cnt].ssid));
-			list.aps[list_cnt].rssi = p_ap_info[i].rssi;
-			list.aps[list_cnt].auth_mode = (p_ap_info[i].authmode != WIFI_AUTH_OPEN);
+			strlcpy(list->aps[list_cnt].ssid, (char*)p_ap_info[i].ssid, sizeof(list->aps[list_cnt].ssid));
+			list->aps[list_cnt].rssi = p_ap_info[i].rssi;
+			list->aps[list_cnt].auth_mode = (p_ap_info[i].authmode != WIFI_AUTH_OPEN);
 			list_cnt++;
 		}
 	}
-	list.cnt = list_cnt;
+	list->cnt = list_cnt;
 	/* Runs on the default Wi-Fi event loop (SCAN_DONE) or the esp_timer task
 	 * (scan guard); never block either of them on a full view queue. */
-	esp_err_t post_err = esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST, &list,
+	esp_err_t post_err = esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST, list,
 					  sizeof(struct view_data_wifi_list), pdMS_TO_TICKS(100));
 	if(post_err != ESP_OK)
 	{
 		ESP_LOGW(TAG, "drop VIEW_EVENT_WIFI_LIST: %s", esp_err_to_name(post_err));
 	}
+	free(list);
 }
 
 /* Read the just-completed scan's records from the driver and publish them.
@@ -135,9 +144,19 @@ static void _wifi_list_post(const wifi_ap_record_t* p_ap_info, uint16_t ap_count
 static void _wifi_scan_publish_records(void) {
 	uint16_t number = WIFI_SCAN_LIST_SIZE;
 	uint16_t ap_count = 0;
-	wifi_ap_record_t ap_info[WIFI_SCAN_LIST_SIZE];
 
-	memset(ap_info, 0, sizeof(ap_info));
+	/* HEAP, not stack: this runs on the default event loop task, whose stack
+	 * (ESP_SYSTEM_EVENT_TASK_STACK_SIZE, 2304 bytes by default) cannot hold
+	 * the ~1.2 KB record array. Static-once callees get inlined into
+	 * _wifi_event_handler, so a stack array here would be allocated on EVERY
+	 * wifi event dispatch and overflow the task stack at first dispatch. */
+	wifi_ap_record_t* ap_info = calloc(WIFI_SCAN_LIST_SIZE, sizeof(wifi_ap_record_t));
+	if(ap_info == NULL)
+	{
+		ESP_LOGE(TAG, "no memory for scan records");
+		_wifi_list_post(NULL, 0);
+		return;
+	}
 
 	if(esp_wifi_scan_get_ap_num(&ap_count) != ESP_OK)
 	{
@@ -150,6 +169,7 @@ static void _wifi_scan_publish_records(void) {
 	ESP_LOGI(TAG, "Total APs scanned = %u, actual AP number ap_info holds = %u", ap_count, number);
 
 	_wifi_list_post(ap_info, min(number, ap_count));
+	free(ap_info);
 }
 
 /* One-shot recovery for a scan that never reports completion. If SCAN_DONE is
