@@ -84,7 +84,7 @@ static void publish_switch_state(const struct view_data_ha_switch_data *switch_d
         int len = snprintf(data_buf, sizeof(data_buf), "{\"%s\": %d}", switch_keys[switch_data->index], (int)switch_data->value);
 
         if (len > 0 && len < MAX_DATA_BUF_LEN) {
-            esp_mqtt_client_publish(mqtt_ha_instance.mqtt_client, switch_topics[switch_data->index], data_buf, len, 0, 0);
+            esp_mqtt_client_publish(mqtt_ha_instance.mqtt_client, switch_topics[switch_data->index], data_buf, len, CONFIG_TOPIC_SWITCH_QOS, 0);
             switch_state[switch_data->index] = switch_data->value;
             ha_ctrl_cfg_save();
         } else {
@@ -185,7 +185,8 @@ void ha_switch_subscribe(esp_mqtt_client_handle_t client)
 
 int ha_switch_on_mqtt_data(const char *topic, int topic_len, const char *data, int data_len)
 {
-    if (strncmp(topic, ha_switch_entities[0].topic_set, topic_len) != 0) {
+    const char *expected_topic = ha_switch_entities[0].topic_set;
+    if (topic_len != (int)strlen(expected_topic) || memcmp(topic, expected_topic, topic_len) != 0) {
         return -1;
     }
 
@@ -201,7 +202,7 @@ int ha_switch_on_mqtt_data(const char *topic, int topic_len, const char *data, i
     size_t key_len = strlen(c_key->string);
 
     for (int i = 0; i < CONFIG_HA_SWITCH_ENTITY_NUM; i++) {
-        if (strncmp(c_key->string, ha_switch_entities[i].key, key_len) == 0) {
+        if (key_len == strlen(ha_switch_entities[i].key) && memcmp(c_key->string, ha_switch_entities[i].key, key_len) == 0) {
             cJSON *cjson_item = cJSON_GetObjectItem(root, ha_switch_entities[i].key);
             if (cjson_item != NULL && cJSON_IsNumber(cjson_item)) {
                 struct view_data_ha_switch_data switch_data = {.index = i, .value = cjson_item->valueint};

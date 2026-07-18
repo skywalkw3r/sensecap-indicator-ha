@@ -21,7 +21,6 @@
 #include "lv_port.h"
 
 #define VERSION		 "v1.1.0"
-#define LOG_MEM_INFO 1
 #define SENSECAP \
 	"\n\
    _____                      _________    ____         \n\
@@ -70,23 +69,4 @@ void app_main(void) {
 	// 				  VIEW_EVENT_WIFI_LIST_REQ, NULL, 0,
 	// 				  portMAX_DELAY); /*send to wifi view*/
 
-#if LOG_MEM_INFO
-	// static char buffer[128];    /* Make sure buffer is enough for `sprintf`
-	// */
-	while(1)
-	{
-		// sprintf(buffer, "   Biggest /     Free /    Total\n"
-		//         "\t  DRAM : [%8d / %8d / %8d]\n"
-		//         "\t PSRAM : [%8d / %8d / %8d]",
-		//         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
-		//         heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-		//         heap_caps_get_total_size(MALLOC_CAP_INTERNAL),
-		//         heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM),
-		//         heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-		//         heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
-		// ESP_LOGI("MEM", "%s", buffer);
-
-		vTaskDelay(pdMS_TO_TICKS(10000));
-	}
-#endif
 }

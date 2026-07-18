@@ -8,7 +8,6 @@ extern "C" {
 #endif
 
 void ha_sensor_init(void);
-void ha_sensor_subscribe(esp_mqtt_client_handle_t client);
 int  ha_sensor_on_mqtt_data(const char *topic, int topic_len,
                              const char *data,  int data_len);
 

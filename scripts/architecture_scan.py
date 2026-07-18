@@ -95,18 +95,6 @@ OCCURRENCE_ALLOWLIST_REASONS: dict[tuple[str, str, str, str], str] = {
 
 
 EVENT_COMMENT_ALLOWLIST_REASONS: dict[str, str] = {
-    "VIEW_EVENT_SENSOR_TEMP_HISTORY": (
-        "existing sensor history event has implicit payload handling in current views"
-    ),
-    "VIEW_EVENT_SENSOR_HUMIDITY_HISTORY": (
-        "existing sensor history event has implicit payload handling in current views"
-    ),
-    "VIEW_EVENT_SENSOR_TVOC_HISTORY": (
-        "existing sensor history event has implicit payload handling in current views"
-    ),
-    "VIEW_EVENT_SENSOR_CO2_HISTORY": (
-        "existing sensor history event has implicit payload handling in current views"
-    ),
     "VIEW_EVENT_WIFI_CFG_DELETE": (
         "existing Wi-Fi config delete event has no documented payload in current code"
     ),
@@ -132,11 +120,15 @@ VIEW_FILE_PATTERNS = (
 )
 
 
+# Model/controller files that must stay UI-free. The current tree keeps each
+# domain model in main/<domain>/<domain>_model.c|h (wifi_model, display_model,
+# sensor_model) plus the top-level indicator_model, and the RP2040 UART ingress
+# lives in rp2040/rp2040.c|h. The old indicator_*_model / esp32_rp2040 names no
+# longer exist, so those patterns matched nothing.
 MODEL_FILE_PATTERNS = (
-    re.compile(r"(^|/)indicator_model\.[ch]$"),
-    re.compile(r"(^|/)indicator_.*_model\.[ch]$"),
+    re.compile(r"(^|/)[A-Za-z0-9]+_model\.[ch]$"),
     re.compile(r"(^|/)indicator_(?!view\.)(?!.*_view)[a-zA-Z0-9_]*\.[ch]$"),
-    re.compile(r"(^|/)esp32_rp2040\.[ch]$"),
+    re.compile(r"(^|/)rp2040/rp2040\.[ch]$"),
 )
 
 
@@ -147,6 +139,69 @@ HA_SWITCH_SCREEN_UI_INCLUDE_RE = re.compile(r"#\s*include\s*[<\"](?:ui/)?(?:ui|u
 HA_SWITCH_SCREEN_GLOBAL_RE = re.compile(r"\bui_switch(?:[0-9]|_btn3)\w*\b")
 BSP_INCLUDE_RE = re.compile(r"#\s*include\s+[<\"](bsp_[^>\"]+)[>\"]")
 SERVICE_CALLBACK_RE = re.compile(r"\b([a-zA-Z0-9_]+_register_(?:cb|callback))\s*\(")
+
+
+def mask_regions(text: str, *, mask_strings: bool) -> str:
+    """Blank out C/C++ comments (and, when requested, string/char literals).
+
+    Tokens like ``lv_label_set_text(`` are only architecture violations when they
+    are real code. A mention inside a ``//`` or ``/* */`` comment (or a log format
+    string) must not trip a rule. Masked characters are replaced with spaces while
+    newlines are preserved, so byte offsets and line numbers computed against the
+    result stay identical to the raw source.
+    """
+    result = list(text)
+    n = len(text)
+    NORMAL, LINE, BLOCK, STRING, CHAR = range(5)
+    state = NORMAL
+    i = 0
+
+    def blank(idx: int) -> None:
+        if text[idx] != "\n":
+            result[idx] = " "
+
+    while i < n:
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if state == NORMAL:
+            if ch == "/" and nxt == "/":
+                result[i] = result[i + 1] = " "
+                state, i = LINE, i + 2
+            elif ch == "/" and nxt == "*":
+                result[i] = result[i + 1] = " "
+                state, i = BLOCK, i + 2
+            elif mask_strings and ch == '"':
+                state, i = STRING, i + 1
+            elif mask_strings and ch == "'":
+                state, i = CHAR, i + 1
+            else:
+                i += 1
+        elif state == LINE:
+            if ch == "\n":
+                state = NORMAL
+            else:
+                blank(i)
+            i += 1
+        elif state == BLOCK:
+            if ch == "*" and nxt == "/":
+                result[i] = result[i + 1] = " "
+                state, i = NORMAL, i + 2
+            else:
+                blank(i)
+                i += 1
+        elif state in (STRING, CHAR):
+            closer = '"' if state == STRING else "'"
+            if ch == "\\":
+                blank(i)
+                if i + 1 < n:
+                    blank(i + 1)
+                i += 2
+            elif ch == closer:
+                state, i = NORMAL, i + 1
+            else:
+                blank(i)
+                i += 1
+    return "".join(result)
 
 
 def rel_key(path: Path) -> str:
@@ -220,9 +275,11 @@ def add_occurrence_finding(
 def scan_model_ui_includes(path: Path, text: str, findings: list[Finding]) -> None:
     if not is_model_file(path):
         return
-    for match in MODEL_UI_INCLUDE_RE.finditer(text):
+    raw_lines = text.splitlines()
+    scan_text = mask_regions(text, mask_strings=False)
+    for match in MODEL_UI_INCLUDE_RE.finditer(scan_text):
         line = line_number(text, match.start())
-        line_text = text.splitlines()[line - 1]
+        line_text = raw_lines[line - 1]
         include_name = match.group(0).split("include", maxsplit=1)[1].strip().strip("<>\"")
         add_occurrence_finding(
             findings,
@@ -238,7 +295,9 @@ def scan_model_ui_includes(path: Path, text: str, findings: list[Finding]) -> No
 def scan_ha_switch_squareline_bindings(path: Path, text: str, findings: list[Finding]) -> None:
     if rel_key(path) != "main/ha/ha_switch_screen.c":
         return
-    for match in HA_SWITCH_SCREEN_UI_INCLUDE_RE.finditer(text):
+    no_comments = mask_regions(text, mask_strings=False)
+    code_only = mask_regions(text, mask_strings=True)
+    for match in HA_SWITCH_SCREEN_UI_INCLUDE_RE.finditer(no_comments):
         line = line_number(text, match.start())
         add_finding(
             findings,
@@ -247,7 +306,7 @@ def scan_ha_switch_squareline_bindings(path: Path, text: str, findings: list[Fin
             "ha-switch-squareline-binding",
             "ha_switch_screen must create its own widgets without SquareLine UI headers",
         )
-    for match in HA_SWITCH_SCREEN_GLOBAL_RE.finditer(text):
+    for match in HA_SWITCH_SCREEN_GLOBAL_RE.finditer(code_only):
         line = line_number(text, match.start())
         add_finding(
             findings,
@@ -261,7 +320,8 @@ def scan_ha_switch_squareline_bindings(path: Path, text: str, findings: list[Fin
 def scan_lvgl_calls(path: Path, text: str, findings: list[Finding]) -> None:
     if is_view_file(path):
         return
-    for match in LVGL_CALL_RE.finditer(text):
+    scan_text = mask_regions(text, mask_strings=True)
+    for match in LVGL_CALL_RE.finditer(scan_text):
         symbol = match.group(1)
         add_symbol_finding(
             findings,
@@ -277,10 +337,12 @@ def scan_shared_bsp_includes(path: Path, text: str, findings: list[Finding]) -> 
     rel = rel_key(path)
     if rel not in {"main/view_data.h"} and not rel.endswith("app_events.h"):
         return
-    for match in BSP_INCLUDE_RE.finditer(text):
+    raw_lines = text.splitlines()
+    scan_text = mask_regions(text, mask_strings=False)
+    for match in BSP_INCLUDE_RE.finditer(scan_text):
         include_name = match.group(1)
         line = line_number(text, match.start())
-        line_text = text.splitlines()[line - 1]
+        line_text = raw_lines[line - 1]
         add_occurrence_finding(
             findings,
             path,
@@ -315,10 +377,12 @@ def scan_event_payload_comments(path: Path, text: str, findings: list[Finding]) 
 
 
 def scan_service_callbacks(path: Path, text: str, findings: list[Finding]) -> None:
-    for match in SERVICE_CALLBACK_RE.finditer(text):
+    raw_lines = text.splitlines()
+    scan_text = mask_regions(text, mask_strings=True)
+    for match in SERVICE_CALLBACK_RE.finditer(scan_text):
         symbol = match.group(1)
         line = line_number(text, match.start())
-        line_text = text.splitlines()[line - 1]
+        line_text = raw_lines[line - 1]
         add_occurrence_finding(
             findings,
             path,

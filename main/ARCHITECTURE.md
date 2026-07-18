@@ -69,7 +69,6 @@ View initialization runs before model initialization in the current code. Screen
 | `view_event_handle` | `VIEW_EVENT_BASE` | `main.c` | Main UI/data bus for cross-domain data flow |
 | `mqtt_app_event_handle` | `MQTT_APP_EVENT_BASE` | `mqtt/mqtt.c` | MQTT client lifecycle commands |
 | `ha_cfg_event_handle` | `HA_CFG_EVENT_BASE` | `ha/ha_mqtt.c` | HA broker config changes |
-| `cmd_cfg_event_handle` | `CMD_CFG_EVENT_BASE` | `cmd/cmd.c` | Serial command events |
 | default event loop | `WIFI_EVENT`, `IP_EVENT` | `wifi/wifi_model.c` | ESP-IDF Wi-Fi driver events |
 
 The event manifest lives in `view_data.h` / `view_data_types.h`. When changing an event payload, update all listed producers and consumers together.

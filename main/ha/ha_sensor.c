@@ -84,17 +84,10 @@ void ha_sensor_init(void)
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SENSOR_DATA, view_event_handler, NULL, NULL));
 }
 
-void ha_sensor_subscribe(esp_mqtt_client_handle_t client)
-{
-    for (int i = 0; i < CONFIG_HA_SENSOR_ENTITY_NUM; i++) {
-        int msg_id = esp_mqtt_client_subscribe(client, ha_sensor_entities[i].topic, ha_sensor_entities[i].qos);
-        ESP_LOGI(TAG, "subscribe:%s, msg_id=%d", ha_sensor_entities[i].topic, msg_id);
-    }
-}
-
 int ha_sensor_on_mqtt_data(const char *topic, int topic_len, const char *data, int data_len)
 {
-    if (strncmp(topic, ha_sensor_entities[0].topic, topic_len) != 0) {
+    const char *expected_topic = ha_sensor_entities[0].topic;
+    if (topic_len != (int)strlen(expected_topic) || memcmp(topic, expected_topic, topic_len) != 0) {
         return -1;
     }
 
@@ -110,7 +103,7 @@ int ha_sensor_on_mqtt_data(const char *topic, int topic_len, const char *data, i
     size_t key_len = strlen(c_key->string);
 
     for (int i = 0; i < CONFIG_HA_SENSOR_ENTITY_NUM; i++) {
-        if (strncmp(c_key->string, ha_sensor_entities[i].key, key_len) == 0) {
+        if (key_len == strlen(ha_sensor_entities[i].key) && memcmp(c_key->string, ha_sensor_entities[i].key, key_len) == 0) {
             cJSON *cjson_item = cJSON_GetObjectItem(root, c_key->string);
             if (cjson_item != NULL && cJSON_IsString(cjson_item)) {
                 struct view_data_ha_sensor_data sensor_data = {.index = i};

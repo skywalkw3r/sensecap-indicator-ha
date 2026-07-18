@@ -9,9 +9,6 @@
 extern "C" {
 #endif
 
-ESP_EVENT_DECLARE_BASE(CMD_CFG_EVENT_BASE);
-extern esp_event_loop_handle_t cmd_cfg_event_handle;
-
 int indicator_cmd_init(void);
 
 #ifdef __cplusplus

@@ -12,7 +12,7 @@ each feature slice owns its full stack (data model + MQTT protocol + UI componen
 | `ha.h` | 50 | Public API for the entire domain. Include this, not individual slice headers. |
 | `ha_mqtt.c` | ~200 | MQTT client lifecycle: connect/disconnect/reconnect. Routes `MQTT_EVENT_DATA` to sensor and switch slices. Owns `mqtt_ha_instance`. |
 | `ha_config.c` | ~154 | Broker NVS config (`ha_cfg_get`/`ha_cfg_set`) + IP address modal view. |
-| `ha_sensor.c` | ~128 | Sensor entity metadata, subscribes to sensor MQTT topics, publishes built-in sensor readings, routes incoming sensor JSON to `VIEW_EVENT_HA_SENSOR`. |
+| `ha_sensor.c` | ~120 | Sensor entity metadata, publishes built-in sensor readings. Retains a dormant JSON parser (`ha_sensor_on_mqtt_data`) that would route incoming sensor JSON to `VIEW_EVENT_HA_SENSOR`; no live subscription (see Known Issues). |
 | `ha_switch.c` | ~237 | Switch entity metadata, NVS state persistence, MQTT publish/subscribe, posts `VIEW_EVENT_HA_SWITCH_SET`. Holds `ha_switch_screen_t *` — does NOT touch LVGL directly. |
 | `ha_switch_screen.c` | ~500 | Builds HA switch widgets on nav tiles. Owns widget handles for all 8 switch widgets. Dispatch table maps index → widget + updater function. |
 | `ha_switch_screen.h` | 18 | `create` / `update` / `destroy` interface. |
@@ -61,8 +61,8 @@ WiFi connects
 
 MQTT connects
   → MQTT_EVENT_CONNECTED
-  → ha_sensor_subscribe() — subscribe to sensor topics
   → ha_switch_subscribe() — subscribe to switch topics, start restore task
+  (ha_sensor no longer self-subscribes to indicator/sensor — see Known Issues)
 
 User changes broker IP
   → ha_config.c: posts VIEW_EVENT_MQTT_ADDR_CHANGED
@@ -74,7 +74,7 @@ User changes broker IP
 
 ## Known Issues
 
-- `VIEW_EVENT_HA_SENSOR` is posted by `ha_sensor.c` but **has no consumer**. The HA sensor data display screen is not yet wired up. See the manifest comment in `view_data.h`.
+- `VIEW_EVENT_HA_SENSOR` is posted by `ha_sensor.c` but **has no consumer**. The HA sensor data display screen is not yet wired up. See the manifest comment in `view_data.h`. `ha_sensor` also no longer subscribes to any topic: it used to subscribe to the device's own publish topic (`indicator/sensor`), which just echoed every publish back and re-parsed it with no consumer. The parser is kept for the future HA-sensor-display feature; wiring it up means subscribing to a real Home Assistant entity topic (issue #5).
 
 ---
 

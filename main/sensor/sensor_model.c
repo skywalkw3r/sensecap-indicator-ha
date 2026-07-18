@@ -107,7 +107,6 @@ const char* get_sensor_name(const enum sensor_data_type type) {
 	}
 }
 #undef X
-#define VIEW_LOG 0
 void indicator_sensor_init(void) {
 	_g_sensors_data_mutex = xSemaphoreCreateMutex();
 	if(_g_sensors_data_mutex == NULL)
@@ -119,10 +118,6 @@ void indicator_sensor_init(void) {
 	{
 		init_sensor_data(&allSensorData[i], i);
 	}
-
-#if VIEW_LOG == 0
-	esp_log_level_set(TAG, ESP_LOG_NONE);
-#endif
 }
 
 SensorData* get_current_sensor_data(SensorData* data, enum sensor_data_type type) {

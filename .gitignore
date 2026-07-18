@@ -61,6 +61,8 @@ dkms.conf
 
 # eclipse setting
 .settings
+.project
+.cproject
 
 # MacOS directory files
 .DS_Store
@@ -94,8 +96,10 @@ main/ui/components/
 # ignore project file
 sdkconfig
 sdkconfig.old
-dependencies.lock
 build
+
+# generated click-deploy package (regenerate from the click_deploy/ sources)
+click_deploy.zip
 
 # PlatformIO
 .pio/

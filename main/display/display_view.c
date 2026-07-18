@@ -349,13 +349,6 @@ void display_cfg_apply_event_cb(lv_event_t* e) // defocused the textarea
 	}
 }
 
-void brighness_update_callback(lv_event_t* e) {
-	struct view_data_display cfg;
-	_display_cfg_get(&cfg);
-	_ensure_display_modal();
-	_apply_display_cfg_to_widgets(&cfg);
-}
-
 static void _view_event_handler(void* handler_args, esp_event_base_t base,
 								int32_t id, void* event_data) {
 	switch(id)
