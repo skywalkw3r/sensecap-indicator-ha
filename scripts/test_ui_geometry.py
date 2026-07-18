@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import unittest
 
 
@@ -52,7 +53,12 @@ class UiGeometryTests(unittest.TestCase):
         nav_header = NAV_HEADER.read_text()
         settings_text = SETTINGS_VIEW.read_text()
 
-        self.assertIn("#define NAV_TILE_COUNT    3", nav_header)
+        # Intent: settings is a modal, never a nav tile. Assert the invariant
+        # (no settings tile, tile count stays small) rather than a literal
+        # count, so legitimate tile removals don't trip this.
+        count_match = re.search(r"#define NAV_TILE_COUNT\s+(\d+)", nav_header)
+        self.assertIsNotNone(count_match, "NAV_TILE_COUNT missing from nav.h")
+        self.assertLessEqual(int(count_match.group(1)), 3)
         self.assertNotIn("NAV_TILE_SETTINGS", nav_header)
         self.assertIn("LV_SYMBOL_SETTINGS", settings_text)
         self.assertIn("lv_obj_set_align(button, LV_ALIGN_TOP_LEFT)", settings_text)
