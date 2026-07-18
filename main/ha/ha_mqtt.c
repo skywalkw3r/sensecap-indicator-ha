@@ -102,25 +102,19 @@ static void _cfg_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "event: HA_CFG_BROKER_SET");
             esp_event_post_to(mqtt_app_event_handle, MQTT_APP_EVENT_BASE, MQTT_APP_RESTART, &instance_ptr, sizeof(instance_mqtt_t), portMAX_DELAY);
             break;
-        case HA_CFG_BROKER_CHANGED: {
-            if (!event_data) {
-                break;
-            }
-            const char *broker_url = (const char *)event_data;
-            ESP_LOGI(TAG, "HA_CFG_BROKER_CHANGED: %s", broker_url);
-            if (instance_ptr->mqtt_client) {
-                /* Client already exists: retarget it in place. */
-                esp_mqtt_client_stop(instance_ptr->mqtt_client);
-                esp_mqtt_client_set_uri(instance_ptr->mqtt_client, broker_url);
-                esp_mqtt_client_start(instance_ptr->mqtt_client);
-            } else {
-                /* Fresh device: no client yet. Create and start one now (reads
-                 * the just-saved config from NVS) so the broker takes effect
-                 * immediately instead of only after a reboot. */
-                _mqtt_ha_start(instance_ptr);
-            }
+        case HA_CFG_BROKER_CHANGED:
+            /* Same handling as HA_CFG_SET: route through MQTT_APP_RESTART so all
+             * client lifecycle runs on the single mqtt_event_task. Calling
+             * _mqtt_ha_start() directly here ran it on ha_event_task, which could
+             * race an MQTT_APP_START on mqtt_event_task (fresh device gets its IP
+             * as the user confirms a broker) and double-free the client/cfg/CA.
+             * The restart re-reads the just-saved NVS config and fully rebuilds
+             * the client, so a scheme change (e.g. mqtt://→mqtts://) also
+             * re-derives TLS trust instead of retargeting a plaintext client.
+             * The broker_url payload is redundant (config is already in NVS). */
+            ESP_LOGI(TAG, "event: HA_CFG_BROKER_CHANGED");
+            esp_event_post_to(mqtt_app_event_handle, MQTT_APP_EVENT_BASE, MQTT_APP_RESTART, &instance_ptr, sizeof(instance_mqtt_t), portMAX_DELAY);
             break;
-        }
         default:
             break;
     }
