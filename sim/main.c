@@ -24,6 +24,7 @@
 #include "ha/ha_switch_screen.h"
 #include "ha/ha_trend_screen.h"
 #include "ha/ha_history.h"
+#include "ha/ha_ws_status_screen.h"
 
 #include "mock/mock_sensors.h"
 
@@ -47,6 +48,7 @@ int main(void) {
     ha_trend_screen_init();
     settings_view_init();
     ha_config_view_init();   /* broker modal (VIEW_EVENT_SCREEN_START handler) */
+    ha_ws_status_screen_init(); /* HA WebSocket status modal (stubbed model) */
 
     /* HA history model (registers the VIEW_EVENT_HA_SENSOR → VIEW_EVENT_HA_HISTORY
      * handler). Must run before the mock seeds so early samples are captured. */
@@ -63,6 +65,14 @@ int main(void) {
     const char *open_broker = getenv("SIM_OPEN_BROKER");
     if (open_broker && *open_broker) {
         uint8_t screen = SCREEN_BROKER_MODAL;
+        esp_event_post_to(view_event_handle, VIEW_EVENT_BASE,
+                          VIEW_EVENT_SCREEN_START, &screen, sizeof(screen), 0);
+    }
+
+    /* SIM_OPEN_HA_WS=1: open the HA WebSocket status modal the same way. */
+    const char *open_ha_ws = getenv("SIM_OPEN_HA_WS");
+    if (open_ha_ws && *open_ha_ws) {
+        uint8_t screen = SCREEN_HA_WS_STATUS;
         esp_event_post_to(view_event_handle, VIEW_EVENT_BASE,
                           VIEW_EVENT_SCREEN_START, &screen, sizeof(screen), 0);
     }

@@ -21,6 +21,28 @@ static const char *TAG = "CMD_RESP";
 
 static ha_cfg_interface ha_cfg;
 
+static void print_ha_ws_usage(void) {
+    printf("\nHome Assistant WebSocket (live display values without an MQTT broker)\n");
+    printf("  Show current config:\n");
+    printf("    haconfig\n\n");
+    printf("  Configure (fields merge into the stored config, so steps can be split):\n");
+    printf("    setha -a 192.168.1.10 -t <long-lived-token>\n");
+    printf("    setha --temp sensor.loft_temperature --humidity sensor.loft_humidity --co2 sensor.loft_co2\n");
+    printf("    setha --enable\n\n");
+    printf("  Turn off (falls back to MQTT: the client is re-enabled automatically):\n");
+    printf("    setha --disable\n\n");
+    printf("  Clear one display slot:\n");
+    printf("    setha --co2 \"\"\n\n");
+    printf("  Notes:\n");
+    printf("    - One transport at a time: 'setha --enable' stops the MQTT client\n");
+    printf("      (panel switch entities pause), 'setha --disable' brings it back.\n");
+    printf("    - Mint the token in HA: Profile -> Security -> Long-lived access tokens.\n");
+    printf("    - Address forms: 192.168.1.10 or ha.local:8123 (-> ws://...:8123),\n");
+    printf("      wss://ha.example.com or https://xyz.ui.nabu.casa (-> wss://...:443).\n");
+    printf("    - wss:// uses the same trust settings as mqtts://: 'setmqttca' for a\n");
+    printf("      private CA, 'setmqtt --insecure/--secure' toggles verification.\n\n");
+}
+
 static void print_mqtt_usage(void) {
     printf("\nMQTT configuration\n");
     printf("  Show current config:\n");
@@ -36,7 +58,9 @@ static void print_mqtt_usage(void) {
     printf("  Notes:\n");
     printf("    - The screen MQTT page only asks for the broker IP. It builds mqtt://<ip>:1883.\n");
     printf("    - TLS setup is console-only; a private-CA broker needs 'setmqttca' first.\n");
-    printf("    - Restart is automatic after setmqtt/setmqttca succeeds.\n\n");
+    printf("    - Restart is automatic after setmqtt/setmqttca succeeds.\n");
+    printf("    - 'setmqtt --enable' / '--disable' toggles the MQTT client. Enabling it\n");
+    printf("      turns the WebSocket client off (one transport at a time).\n\n");
     printf("MQTT topics and payloads\n");
     printf("  Sensor data from device:\n");
     printf("    topic: %s\n", CONFIG_TOPIC_SENSOR_DATA);
@@ -61,38 +85,68 @@ static bool normalize_broker_url(const char *input, char *output, size_t output_
     return written > 0 && (size_t)written < output_size;
 }
 
+/* Shared by the MQTT (mqtts://) and WebSocket (wss://) blocks — both ride on
+ * the same stored trust settings. */
+static void print_tls_trust_rows(void) {
+    size_t ca_len = 0;
+    char *ca = ha_tls_ca_load(&ca_len);
+    ESP_LOGI(TAG, "| TLS mode                     | %-40s |",
+             ha_tls_mode_get() == HA_TLS_MODE_INSECURE ? "INSECURE (no verification)" : "verify");
+    if (ca != NULL) {
+        char ca_status[41];
+        snprintf(ca_status, sizeof(ca_status), "stored (%u bytes)", (unsigned)ca_len);
+        ESP_LOGI(TAG, "| TLS custom CA                | %-40s |", ca_status);
+        free(ca);
+    } else {
+        ESP_LOGI(TAG, "| TLS custom CA                | %-40s |", "(none — public CA bundle)");
+    }
+}
+
 static int read_ha_config(int argc, char **argv) {
     esp_err_t err = ha_cfg_get(&ha_cfg);
     if (err != ESP_OK || ha_cfg.broker_url[0] == '\0') {
         ESP_LOGI(TAG, "MQTT not configured — set a broker with 'setmqtt' (see 'mqtthelp').");
-        return 0;
-    }
-    ESP_LOGI(TAG, "| Broker Address               | %-40s |", ha_cfg.broker_url);
-    ESP_LOGI(TAG, "| Client ID                    | %-40s |", ha_cfg.client_id);
-    ESP_LOGI(TAG, "| MQTT username                | %-40s |", ha_cfg.username);
-    ESP_LOGI(TAG, "| MQTT password                | %-40s |", ha_cfg.password[0] ? "****" : "(not set)");
-    if (ha_tls_url_is_tls(ha_cfg.broker_url)) {
-        size_t ca_len = 0;
-        char *ca = ha_tls_ca_load(&ca_len);
-        ESP_LOGI(TAG, "| TLS mode                     | %-40s |",
-                 ha_tls_mode_get() == HA_TLS_MODE_INSECURE ? "INSECURE (no verification)" : "verify");
-        if (ca != NULL) {
-            char ca_status[41];
-            snprintf(ca_status, sizeof(ca_status), "stored (%u bytes)", (unsigned)ca_len);
-            ESP_LOGI(TAG, "| TLS custom CA                | %-40s |", ca_status);
-            free(ca);
-        } else {
-            ESP_LOGI(TAG, "| TLS custom CA                | %-40s |", "(none — public CA bundle)");
-        }
     } else {
-        ESP_LOGI(TAG, "| TLS                          | %-40s |", "off (mqtt:// broker URL)");
+        ESP_LOGI(TAG, "| MQTT client                  | %-40s |",
+                 ha_mqtt_enabled_get() ? "enabled" : "disabled");
+        ESP_LOGI(TAG, "| Broker Address               | %-40s |", ha_cfg.broker_url);
+        ESP_LOGI(TAG, "| Client ID                    | %-40s |", ha_cfg.client_id);
+        ESP_LOGI(TAG, "| MQTT username                | %-40s |", ha_cfg.username);
+        ESP_LOGI(TAG, "| MQTT password                | %-40s |", ha_cfg.password[0] ? "****" : "(not set)");
+        if (ha_tls_url_is_tls(ha_cfg.broker_url)) {
+            print_tls_trust_rows();
+        } else {
+            ESP_LOGI(TAG, "| TLS                          | %-40s |", "off (mqtt:// broker URL)");
+        }
     }
-    ESP_LOGI(TAG, "Run 'mqtthelp' for setmqtt examples and MQTT topic/payload examples.");
+
+    ha_ws_cfg_t ws_cfg;
+    ha_ws_cfg_get(&ws_cfg);
+    if (!ws_cfg.enabled && ws_cfg.url[0] == '\0' && ws_cfg.token[0] == '\0') {
+        ESP_LOGI(TAG, "HA WebSocket not configured — see the 'setha' section in 'mqtthelp'.");
+    } else {
+        static const char *slot_name[HA_WS_ENTITY_NUM] = {"temp", "humidity", "co2"};
+        ESP_LOGI(TAG, "| HA WebSocket                 | %-40s |", ws_cfg.enabled ? "enabled" : "disabled");
+        ESP_LOGI(TAG, "| HA WebSocket URL             | %-40s |", ws_cfg.url[0] ? ws_cfg.url : "(not set)");
+        ESP_LOGI(TAG, "| HA access token              | %-40s |", ws_cfg.token[0] ? "**** (set)" : "(not set)");
+        for (int i = 0; i < HA_WS_ENTITY_NUM; i++) {
+            char row[41];
+            snprintf(row, sizeof(row), "Entity (%s)", slot_name[i]);
+            ESP_LOGI(TAG, "| %-28s | %-40s |", row,
+                     ws_cfg.entity_id[i][0] ? ws_cfg.entity_id[i] : "(not set)");
+        }
+        if (strncmp(ws_cfg.url, "wss://", 6) == 0) {
+            print_tls_trust_rows();
+        }
+    }
+
+    ESP_LOGI(TAG, "Run 'mqtthelp' for setmqtt/setha examples and MQTT topic/payload examples.");
     return 0;
 }
 
 static int mqtt_help(int argc, char **argv) {
     print_mqtt_usage();
+    print_ha_ws_usage();
     return 0;
 }
 
@@ -123,6 +177,8 @@ struct {
     struct arg_str *client_id;
     struct arg_lit *insecure;
     struct arg_lit *secure;
+    struct arg_lit *enable;
+    struct arg_lit *disable;
     struct arg_end *end;
 } mqtt_args;
 
@@ -136,7 +192,8 @@ static int mqtt_config_set(int argc, char **argv) {
 
     if (!mqtt_args.username->count && !mqtt_args.password->count &&
         !mqtt_args.broker_url->count && !mqtt_args.client_id->count &&
-        !mqtt_args.insecure->count && !mqtt_args.secure->count) {
+        !mqtt_args.insecure->count && !mqtt_args.secure->count &&
+        !mqtt_args.enable->count && !mqtt_args.disable->count) {
         print_mqtt_usage();
         return 0;
     }
@@ -144,6 +201,32 @@ static int mqtt_config_set(int argc, char **argv) {
     if (mqtt_args.insecure->count > 0 && mqtt_args.secure->count > 0) {
         ESP_LOGE(TAG, "--insecure and --secure are mutually exclusive");
         return 1;
+    }
+    if (mqtt_args.enable->count > 0 && mqtt_args.disable->count > 0) {
+        ESP_LOGE(TAG, "--enable and --disable are mutually exclusive");
+        return 1;
+    }
+
+    if (mqtt_args.enable->count > 0) {
+        if (ha_mqtt_enabled_set(true) != ESP_OK) return 1;
+        ESP_LOGI(TAG, "MQTT client enabled");
+        /* One transport at a time: switching to MQTT turns WebSocket off. */
+        ha_ws_cfg_t ws_cfg;
+        ha_ws_cfg_get(&ws_cfg);
+        if (ws_cfg.enabled) {
+            ws_cfg.enabled = 0;
+            if (ha_ws_cfg_set(&ws_cfg) != ESP_OK) return 1;
+            ESP_LOGI(TAG, "HA WebSocket client disabled (one transport at a time)");
+        }
+    }
+    if (mqtt_args.disable->count > 0) {
+        if (ha_mqtt_enabled_set(false) != ESP_OK) return 1;
+        ESP_LOGI(TAG, "MQTT client disabled");
+    }
+    if (mqtt_args.enable->count > 0 || mqtt_args.disable->count > 0) {
+        /* Rebuild the WS side too: applies a WS shutdown on --enable and
+         * refreshes the settings status modal in both directions. */
+        esp_event_post_to(ha_cfg_event_handle, HA_WS_EVENT_BASE, HA_WS_CFG_CHANGED, NULL, 0, portMAX_DELAY);
     }
     if (mqtt_args.insecure->count > 0) {
         if (ha_tls_mode_set(HA_TLS_MODE_INSECURE) != ESP_OK) return 1;
@@ -199,7 +282,9 @@ static void register_mqtt_config(void) {
     mqtt_args.client_id  = arg_str0("c", "id", "<client_id>", "MQTT client ID");
     mqtt_args.insecure   = arg_lit0(NULL, "insecure", "mqtts: skip server certificate verification");
     mqtt_args.secure     = arg_lit0(NULL, "secure", "mqtts: verify server certificate (default)");
-    mqtt_args.end        = arg_end(6);
+    mqtt_args.enable     = arg_lit0(NULL, "enable", "start the MQTT client (turns the WebSocket client off)");
+    mqtt_args.disable    = arg_lit0(NULL, "disable", "stop the MQTT client");
+    mqtt_args.end        = arg_end(8);
 
     const esp_console_cmd_t cmd = {
         .command  = "setmqtt",
@@ -322,6 +407,169 @@ static void register_mqtt_ca(void) {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
+struct {
+    struct arg_str *addr;
+    struct arg_str *token;
+    struct arg_str *temp;
+    struct arg_str *humidity;
+    struct arg_str *co2;
+    struct arg_lit *enable;
+    struct arg_lit *disable;
+    struct arg_end *end;
+} ha_ws_args;
+
+/* HA entity ids are domain.object_id. The charset check doubles as JSON-frame
+ * safety: everything accepted here can be snprintf'd into the subscribe frame
+ * without escaping. */
+static bool entity_id_ok(const char *s) {
+    size_t len = strlen(s);
+    if (len < 3 || len > 63 || s[0] == '.') return false;
+    bool has_dot = false;
+    for (size_t i = 0; i < len; i++) {
+        char c = s[i];
+        if (c == '.') has_dot = true;
+        else if (!isalnum((unsigned char)c) && c != '_' && c != '-') return false;
+    }
+    return has_dot;
+}
+
+/* Merge one entity-slot argument into cfg; "" clears the slot. */
+static bool ha_ws_merge_entity(const struct arg_str *arg, char *slot, size_t slot_size,
+                               const char *slot_name) {
+    if (arg->count == 0) return true;
+    const char *val = arg->sval[0];
+    memset(slot, 0, slot_size);
+    if (val[0] == '\0') {
+        ESP_LOGI(TAG, "Cleared %s entity", slot_name);
+        return true;
+    }
+    if (!entity_id_ok(val)) {
+        ESP_LOGE(TAG, "Invalid %s entity id '%s' (want e.g. sensor.loft_temperature, max 63 chars)",
+                 slot_name, val);
+        return false;
+    }
+    strncpy(slot, val, slot_size - 1);
+    ESP_LOGI(TAG, "Set %s entity: %s", slot_name, slot);
+    return true;
+}
+
+static int ha_ws_config_set_cmd(int argc, char **argv) {
+    int nerrors = arg_parse(argc, argv, (void **)&ha_ws_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, ha_ws_args.end, argv[0]);
+        print_ha_ws_usage();
+        return 1;
+    }
+
+    if (!ha_ws_args.addr->count && !ha_ws_args.token->count && !ha_ws_args.temp->count &&
+        !ha_ws_args.humidity->count && !ha_ws_args.co2->count && !ha_ws_args.enable->count &&
+        !ha_ws_args.disable->count) {
+        print_ha_ws_usage();
+        return 0;
+    }
+
+    if (ha_ws_args.enable->count > 0 && ha_ws_args.disable->count > 0) {
+        ESP_LOGE(TAG, "--enable and --disable are mutually exclusive");
+        return 1;
+    }
+
+    ha_ws_cfg_t ws_cfg;
+    ha_ws_cfg_get(&ws_cfg); /* NOT_FOUND is fine: merge into a zeroed config */
+
+    if (ha_ws_args.addr->count > 0) {
+        char url[sizeof(ws_cfg.url)];
+        if (!ha_ws_url_normalize(ha_ws_args.addr->sval[0], url, sizeof(url))) {
+            ESP_LOGE(TAG, "Invalid HA address: %s", ha_ws_args.addr->sval[0]);
+            return 1;
+        }
+        memset(ws_cfg.url, 0, sizeof(ws_cfg.url));
+        strncpy(ws_cfg.url, url, sizeof(ws_cfg.url) - 1);
+        ESP_LOGI(TAG, "Set HA WebSocket URL: %s", ws_cfg.url);
+    }
+
+    if (ha_ws_args.token->count > 0) {
+        const char *token = ha_ws_args.token->sval[0];
+        size_t token_len = strlen(token);
+        if (token_len == 0 || token_len >= sizeof(ws_cfg.token)) {
+            ESP_LOGE(TAG, "Token must be 1-%u characters (got %u)",
+                     (unsigned)sizeof(ws_cfg.token) - 1, (unsigned)token_len);
+            return 1;
+        }
+        for (size_t i = 0; i < token_len; i++) {
+            unsigned char c = (unsigned char)token[i];
+            if (c <= ' ' || c == '"' || c == '\\' || c > 0x7e) {
+                ESP_LOGE(TAG, "Token contains an unsupported character at position %u", (unsigned)i);
+                return 1;
+            }
+        }
+        memset(ws_cfg.token, 0, sizeof(ws_cfg.token));
+        strncpy(ws_cfg.token, token, sizeof(ws_cfg.token) - 1);
+        ESP_LOGI(TAG, "Set HA access token: ****");
+    }
+
+    if (!ha_ws_merge_entity(ha_ws_args.temp, ws_cfg.entity_id[0], sizeof(ws_cfg.entity_id[0]), "temp") ||
+        !ha_ws_merge_entity(ha_ws_args.humidity, ws_cfg.entity_id[1], sizeof(ws_cfg.entity_id[1]), "humidity") ||
+        !ha_ws_merge_entity(ha_ws_args.co2, ws_cfg.entity_id[2], sizeof(ws_cfg.entity_id[2]), "co2")) {
+        return 1;
+    }
+
+    if (ha_ws_args.enable->count > 0) {
+        bool has_entity = ws_cfg.entity_id[0][0] || ws_cfg.entity_id[1][0] || ws_cfg.entity_id[2][0];
+        if (ws_cfg.url[0] == '\0' || ws_cfg.token[0] == '\0' || !has_entity) {
+            ESP_LOGE(TAG, "Cannot enable: missing%s%s%s (see 'mqtthelp')",
+                     ws_cfg.url[0] == '\0' ? " address (-a)" : "",
+                     ws_cfg.token[0] == '\0' ? " token (-t)" : "",
+                     !has_entity ? " an entity (--temp/--humidity/--co2)" : "");
+            return 1;
+        }
+        ws_cfg.enabled = 1;
+        ESP_LOGI(TAG, "HA WebSocket client enabled");
+        /* One transport at a time: WS takes over, the MQTT client stops (the
+         * panel's MQTT switch entities pause until 'setmqtt --enable'). */
+        if (ha_mqtt_enabled_set(false) != ESP_OK) return 1;
+        ESP_LOGI(TAG, "MQTT client disabled (one transport at a time)");
+    }
+    if (ha_ws_args.disable->count > 0) {
+        ws_cfg.enabled = 0;
+        ESP_LOGI(TAG, "HA WebSocket client disabled");
+        if (ha_mqtt_enabled_set(true) != ESP_OK) return 1;
+        ESP_LOGI(TAG, "MQTT client re-enabled");
+    }
+
+    if (ha_ws_cfg_set(&ws_cfg) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save HA WebSocket configuration");
+        return 1;
+    }
+    esp_event_post_to(ha_cfg_event_handle, HA_WS_EVENT_BASE, HA_WS_CFG_CHANGED, NULL, 0, portMAX_DELAY);
+    if (ha_ws_args.enable->count > 0 || ha_ws_args.disable->count > 0) {
+        /* Apply the MQTT side of the toggle (start or stop that client). */
+        esp_event_post_to(ha_cfg_event_handle, HA_CFG_EVENT_BASE, HA_CFG_SET, NULL, 0, portMAX_DELAY);
+    }
+    ESP_LOGI(TAG, "HA WebSocket configuration saved. Applying.");
+    return 0;
+}
+
+static void register_ha_ws_config(void) {
+    ha_ws_args.addr     = arg_str0("a", "addr", "<url>",
+                                   "HA address, e.g. 192.168.1.10, ha.local:8123 or wss://ha.example.com");
+    ha_ws_args.token    = arg_str0("t", "token", "<token>", "HA long-lived access token");
+    ha_ws_args.temp     = arg_str0(NULL, "temp", "<entity_id>", "entity for the temperature tile (\"\" clears)");
+    ha_ws_args.humidity = arg_str0(NULL, "humidity", "<entity_id>", "entity for the humidity tile (\"\" clears)");
+    ha_ws_args.co2      = arg_str0(NULL, "co2", "<entity_id>", "entity for the CO2 tile (\"\" clears)");
+    ha_ws_args.enable   = arg_lit0(NULL, "enable", "start the WebSocket client (needs addr+token+entity)");
+    ha_ws_args.disable  = arg_lit0(NULL, "disable", "stop the WebSocket client");
+    ha_ws_args.end      = arg_end(7);
+
+    const esp_console_cmd_t cmd = {
+        .command  = "setha",
+        .help     = "Set HA WebSocket config. Example: setha -a 192.168.1.10 -t <token> --temp sensor.x --enable",
+        .hint     = NULL,
+        .func     = &ha_ws_config_set_cmd,
+        .argtable = &ha_ws_args,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
 int indicator_cmd_init(void) {
     esp_console_repl_t       *repl        = NULL;
     esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
@@ -333,6 +581,7 @@ int indicator_cmd_init(void) {
     register_mqtt_help();
     register_mqtt_config();
     register_mqtt_ca();
+    register_ha_ws_config();
 
     esp_console_dev_uart_config_t hw_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_console_new_repl_uart(&hw_config, &repl_config, &repl));

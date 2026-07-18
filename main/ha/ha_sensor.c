@@ -1,5 +1,6 @@
 #include "ha_sensor.h"
 #include "ha_mqtt.h"
+#include "ha_ws.h"
 #include "view_data.h"
 #include "home_assistant_config.h"
 #include "cJSON.h"
@@ -97,6 +98,13 @@ int ha_sensor_on_mqtt_data(const char *topic, int topic_len, const char *data, i
 {
     if (topic_len != (int)strlen(CONFIG_TOPIC_DISPLAY_SET) ||
         memcmp(topic, CONFIG_TOPIC_DISPLAY_SET, topic_len) != 0) {
+        return -1;
+    }
+
+    /* While the WebSocket client is enabled it owns the display values;
+     * accepting this topic too would double-feed the history buffer. */
+    if (ha_ws_is_enabled()) {
+        ESP_LOGD(TAG, "display/set ignored: WebSocket client is the live-data source");
         return -1;
     }
 

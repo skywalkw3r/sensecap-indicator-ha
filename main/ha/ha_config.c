@@ -405,6 +405,27 @@ esp_err_t ha_cfg_set(ha_cfg_interface *cfg)
     return err;
 }
 
+bool ha_mqtt_enabled_get(void)
+{
+    uint8_t enabled = 1; /* missing/invalid key = enabled (pre-toggle behavior) */
+    size_t len = sizeof(enabled);
+    esp_err_t err = indicator_nvs_read(MQTT_ENABLED_STORAGE, &enabled, &len);
+    if (err != ESP_OK || len != sizeof(enabled)) {
+        return true;
+    }
+    return enabled != 0;
+}
+
+esp_err_t ha_mqtt_enabled_set(bool enabled)
+{
+    uint8_t value = enabled ? 1 : 0;
+    esp_err_t err = indicator_nvs_write(MQTT_ENABLED_STORAGE, &value, sizeof(value));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "mqtt enabled flag write err:%d", err);
+    }
+    return err;
+}
+
 void ha_config_view_init(void)
 {
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SCREEN_START, view_event_handler, NULL, NULL));

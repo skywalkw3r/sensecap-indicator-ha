@@ -9,6 +9,8 @@
  *   ha_switch.h        — switch entity, MQTT routing, screen attachment
  *   ha_history.h       — sensor-history model (feeds the trends chart)
  *   ha_trend_screen.h  — trends chart tile
+ *   ha_ws.h            — HA WebSocket API client lifecycle + status
+ *   ha_ws_config.h     — WebSocket NVS config types and API
  */
 #include "view_data.h"
 #include "ha_config.h"
@@ -17,5 +19,8 @@
 #include "ha_switch.h"
 #include "ha_history.h"
 #include "ha_trend_screen.h"
+#include "ha_ws.h"
+#include "ha_ws_config.h"
+#include "ha_ws_status_screen.h"
 
 #endif /* HA_H */

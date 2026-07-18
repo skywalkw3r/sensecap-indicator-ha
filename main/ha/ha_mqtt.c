@@ -146,6 +146,18 @@ static void _mqtt_ha_start(instance_mqtt *instance)
         s_tls_ca = NULL;
     }
 
+    /* One live-data transport at a time: the console toggles keep the two
+     * flags consistent, and if NVS ever says both, WebSocket wins. Checked
+     * after the teardown above so disabling stops a running client. */
+    if (!ha_mqtt_enabled_get()) {
+        ESP_LOGI(TAG, "MQTT idle: disabled ('setmqtt --enable' to turn back on)");
+        return;
+    }
+    if (ha_ws_is_enabled()) {
+        ESP_LOGW(TAG, "MQTT idle: WebSocket client is enabled and takes precedence");
+        return;
+    }
+
     ha_cfg_interface hf_cfg;
     if (ha_cfg_get(&hf_cfg) != ESP_OK || hf_cfg.broker_url[0] == '\0') {
         /* Unconfigured device: this is not an error. Stay idle until a broker
@@ -255,6 +267,11 @@ int indicator_ha_model_init(void)
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(ha_cfg_event_handle, HA_CFG_EVENT_BASE, ESP_EVENT_ANY_ID, _cfg_event_handler, NULL, NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_ST, view_event_handler, NULL, NULL));
+
+    /* WebSocket sibling: registers its own event base on ha_cfg_event_handle,
+     * so this must follow the loop creation above. */
+    ha_ws_init();
+
     esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_ADDR_DISPLAY, NULL, 0, portMAX_DELAY);
     return ESP_OK;
 }
@@ -267,5 +284,7 @@ int indicator_ha_view_init(void)
     /* Trends tile (NAV_TILE_HA_TREND). HA domain owns the view; indicator_view.c
      * reaches it through this aggregator, the same path as the switch screen. */
     ha_trend_screen_init();
+    /* WebSocket status modal (settings "Home Assistant" card target). */
+    ha_ws_status_screen_init();
     return ESP_OK;
 }

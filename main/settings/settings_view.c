@@ -88,6 +88,14 @@ static void settings_open_broker(lv_event_t *e)
 	}
 }
 
+static void settings_open_ha_ws(lv_event_t *e)
+{
+	if(lv_event_get_code(e) == LV_EVENT_CLICKED)
+	{
+		settings_post_screen(SCREEN_HA_WS_STATUS);
+	}
+}
+
 static void settings_on_back(lv_event_t *e)
 {
 	if(lv_event_get_code(e) == LV_EVENT_CLICKED)
@@ -180,18 +188,20 @@ static void settings_create_modal(void)
 	lv_obj_set_align(s_settings_ip_label, LV_ALIGN_TOP_MID);
 	lv_obj_set_y(s_settings_ip_label, 105);
 
+	/* 2x2 card grid: WiFi/Display on the first row, MQTT/Home Assistant on
+	 * the second. Same component everywhere so the entries match. */
 	settings_create_card(s_settings_modal, 80, 150,
 						 UI_COLOR_BLUE, "WiFi", LV_SYMBOL_WIFI,
 						 settings_open_wifi);
 	settings_create_card(s_settings_modal, 250, 150,
 						 UI_COLOR_AMBER, "Display", LV_SYMBOL_IMAGE,
 						 settings_open_display);
-
-	/* Third card, centered under the WiFi/Display row — same component so the
-	 * broker entry matches the other settings buttons. */
-	settings_create_card(s_settings_modal, 165, 320,
+	settings_create_card(s_settings_modal, 80, 320,
 						 UI_COLOR_GREEN, "MQTT", LV_SYMBOL_UPLOAD,
 						 settings_open_broker);
+	settings_create_card(s_settings_modal, 250, 320,
+						 UI_COLOR_PRIMARY, "Home Asst", LV_SYMBOL_HOME,
+						 settings_open_ha_ws);
 }
 
 int settings_view_init(void)

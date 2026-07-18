@@ -41,8 +41,8 @@ Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudi
 - [x] NVS-backed persistence for Wi-Fi credentials, MQTT config, switch state
 - [x] Display brightness and sleep-mode controls
 - [x] PC simulator for iterating on the UI without flashing hardware
+- [x] Home Assistant WebSocket API client — live temp/humidity/CO₂ straight from HA entities, no broker or automation needed; console toggle runs MQTT or WebSocket one-at-a-time (see [Option B](#option-b--native-websocket-no-broker-needed-for-live-values))
 - [ ] REST API
-- [ ] WebSocket
 
 ---
 
@@ -133,6 +133,15 @@ Three fixed topics carry all communication:
 
 ## Home Assistant Setup
 
+The device speaks two transports and runs **one at a time**: MQTT (switch
+entities + display values pushed by an HA automation, Option A) or the native
+WebSocket client (subscribes to HA entities directly, Option B — simpler for
+live values, no broker or automation YAML, but the MQTT switch entities pause
+while it is active). `setha --enable` switches to WebSocket, `setha --disable`
+or `setmqtt --enable` switches back to MQTT.
+
+### MQTT (switches, and Option A for display values)
+
 1. **Install an MQTT broker** (Mosquitto is the simplest) and enable the MQTT integration in Home Assistant.
 
 2. **Point the Indicator at the broker** — from the device's MQTT screen, or via [`setmqtt`](#console-commands) over serial. The device ships with **no default broker**; until you set one it stays idle (it never connects to a public internet broker on its own). Once Wi-Fi has an IP address and a broker is configured, the client connects within seconds — internet access is not required, so isolated IoT VLANs work fine.
@@ -144,6 +153,33 @@ Three fixed topics carry all communication:
 <img src="./assets/Home Assistant Dashboard.png" />
 
 See also: [Seeed wiki — Home Assistant application guide](https://wiki.seeedstudio.com/SenseCAP_Indicator_Application_Home_Assistant/).
+
+### Option B — native WebSocket (no broker needed for live values)
+
+The device connects out to HA's WebSocket API (`ws(s)://<ha>:8123/api/websocket`),
+authenticates with a long-lived access token and subscribes to up to three
+entities — HA pushes every state change instantly. No inbound port is opened on
+the device, and no HA-side automation is needed.
+
+1. **Mint a token** in Home Assistant: Profile → Security → *Long-lived access tokens* → Create token.
+2. **Configure over the serial console** (fields merge, so this can be split across commands):
+
+   ```text
+   setha -a 192.168.1.10 -t <long-lived-token>
+   setha --temp sensor.loft_temperature --humidity sensor.loft_humidity --co2 sensor.loft_co2
+   setha --enable
+   ```
+
+3. **Check it**: `haconfig` prints the WS block; the Settings → *Home Asst* card on
+   the touchscreen shows live connection status. `setha --disable` switches back
+   to MQTT.
+
+Enabling the WebSocket client stops the MQTT client (one transport at a time),
+so the panel's MQTT switch entities pause until you switch back with
+`setha --disable` or `setmqtt --enable`. Addresses accept bare IPs
+(`192.168.1.10` → `ws://…:8123`) or TLS URLs (`wss://ha.example.com`,
+`https://xyz.ui.nabu.casa` → `wss://…:443`); `wss://` uses the same trust
+settings as `mqtts://` (see [TLS](#tls-mqtts)).
 
 ---
 
@@ -194,19 +230,24 @@ Connect at the device's baud rate and use these commands:
 
 | Command | Description |
 |---------|-------------|
-| `mqtthelp` | Print broker, topic, and payload examples |
-| `haconfig` | Print the current MQTT/HA configuration |
+| `mqtthelp` | Print broker, topic, payload and `setha` examples |
+| `haconfig` | Print the current MQTT + WebSocket configuration |
 | `setmqtt -a <addr>` | Set broker address (e.g., `mqtt://192.168.1.10:1883`) |
 | `setmqtt -a <addr> -c <client-id> -u <user> -p <pass>` | Full broker configuration |
+| `setha -a <addr> -t <token>` | Set the HA WebSocket address + access token |
+| `setha --temp/--humidity/--co2 <entity_id>` | Map HA entities to the display tiles (`""` clears a slot) |
+| `setha --enable` / `--disable` | Switch to WebSocket / back to MQTT (one transport at a time) |
+| `setmqtt --enable` / `--disable` | Turn the MQTT client on (stops WebSocket) / off |
 
 **Examples:**
 
 ```text
 setmqtt -a 192.168.1.10 -c indicator-01 -u mqtt_user -p mqtt_password
 setmqtt --addr mqtt://192.168.1.10:1883
+setha -a 192.168.1.10 -t eyJhbGciOi... --temp sensor.loft_temperature --enable
 ```
 
-After `setmqtt` succeeds, the configuration is saved to NVS and the MQTT client restarts automatically.
+After `setmqtt`/`setha` succeeds, the configuration is saved to NVS and the affected client restarts automatically.
 
 ### TLS (`mqtts://`)
 
@@ -222,6 +263,8 @@ Use an `mqtts://` broker URL to encrypt the MQTT connection (port defaults to 88
 Verification order: stored CA if present, otherwise the public CA bundle (for
 cloud brokers with real certificates). LAN brokers with a self-signed/private
 CA need `setmqttca`. The touchscreen MQTT page stays plaintext-only (`mqtt://`).
+The same stored trust settings (mode + CA) also govern `wss://` WebSocket
+connections to Home Assistant.
 
 **With Home Assistant's Mosquitto add-on:** set `certfile`/`keyfile`/`cafile`
 in the add-on configuration to expose a TLS listener on 8883 (HA and other
@@ -230,7 +273,7 @@ local clients can keep using 1883 internally), then paste your CA cert into
 
 ### Security notes
 
-MQTT and Wi-Fi credentials are stored in plaintext in NVS, and the serial console is unauthenticated — anyone with physical or USB access can read them back. Use a dedicated MQTT user with a limited ACL so a leaked credential can't reach the rest of your broker. Before reselling or disposing of the device, run `idf.py erase-flash` to wipe stored credentials.
+MQTT and Wi-Fi credentials — and the Home Assistant long-lived access token — are stored in plaintext in NVS, and the serial console is unauthenticated — anyone with physical or USB access can read them back. Use a dedicated MQTT user with a limited ACL so a leaked credential can't reach the rest of your broker, and remember the HA token can be revoked any time from the HA profile page. Before reselling or disposing of the device, run `idf.py erase-flash` to wipe stored credentials.
 
 ---
 

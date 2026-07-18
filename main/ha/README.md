@@ -16,6 +16,9 @@ each feature slice owns its full stack (data model + MQTT protocol + UI componen
 | `ha_switch.c` | ~237 | Switch entity metadata, NVS state persistence, MQTT publish/subscribe, posts `VIEW_EVENT_HA_SWITCH_SET`. Holds `ha_switch_screen_t *` — does NOT touch LVGL directly. |
 | `ha_switch_screen.c` | ~500 | Builds HA switch widgets on nav tiles. Owns widget handles for all 8 switch widgets. Dispatch table maps index → widget + updater function. |
 | `ha_switch_screen.h` | 18 | `create` / `update` / `destroy` interface. |
+| `ha_ws.c` | ~430 | HA WebSocket API client: lifecycle on `ha_event_task` (own `HA_WS_EVENT_BASE`), auth + `subscribe_entities` protocol, frame reassembly, posts `VIEW_EVENT_HA_SENSOR` + `VIEW_EVENT_HA_WS_STATUS`. |
+| `ha_ws_config.c` | ~100 | WebSocket NVS config (`ha_ws_cfg_get`/`ha_ws_cfg_set`, own `"ha-ws"` key) + URL normalization. |
+| `ha_ws_status_screen.c` | ~160 | Read-only WebSocket status modal (settings "Home Asst" card target). |
 
 ---
 
@@ -72,9 +75,29 @@ User changes broker IP
 
 ---
 
-## Known Issues
+## Live display values (two sources)
 
-- `VIEW_EVENT_HA_SENSOR` is posted by `ha_sensor.c` but **has no consumer**. The HA sensor data display screen is not yet wired up. See the manifest comment in `view_data.h`. `ha_sensor` also no longer subscribes to any topic: it used to subscribe to the device's own publish topic (`indicator/sensor`), which just echoed every publish back and re-parsed it with no consumer. The parser is kept for the future HA-sensor-display feature; wiring it up means subscribing to a real Home Assistant entity topic (issue #5).
+`VIEW_EVENT_HA_SENSOR` (consumed by `ha_switch.c` tiles and `ha_history.c` →
+Trends chart) has two producers, never active at the same time:
+
+- **MQTT**: `ha_sensor.c` subscribes to `indicator/display/set` and parses
+  HA-pushed JSON (`{"loft_temp":72.4,...}`).
+- **WebSocket**: `ha_ws.c` subscribes to the configured HA entities over the HA
+  WebSocket API.
+
+The whole transports are one-at-a-time: `setha --enable` sets the `"mqtt-en"`
+NVS flag to 0 so `_mqtt_ha_start` stays down (switch entities pause);
+`setha --disable` / `setmqtt --enable` flip it back and disable WS. If NVS ever
+claims both, WS wins (`_mqtt_ha_start` defers to `ha_ws_is_enabled()`), and
+`ha_sensor_on_mqtt_data()` additionally ignores `indicator/display/set` while
+WS is enabled so the history buffer can never double-feed.
+
+```
+WS connects (ha_event_task built it after HA_WS_CFG_CHANGED / HA_WS_NET_UP)
+  → auth_required → auth (token) → auth_ok → subscribe_entities
+  → "a"/"c" entity events → post VIEW_EVENT_HA_SENSOR {index, value}
+  → auth_invalid → HA_WS_AUTH_FAIL → teardown + latch until next setha
+```
 
 ---
 

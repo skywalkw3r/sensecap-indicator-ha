@@ -15,6 +15,7 @@ enum start_screen {
     SCREEN_WIFI_CONFIG = 1,
     SCREEN_DISPLAY_MODAL = 2,
     SCREEN_BROKER_MODAL = 3,
+    SCREEN_HA_WS_STATUS = 4,
 };
 
 /* ── WiFi ─────────────────────────────────────────────────────────────────── */
@@ -135,6 +136,13 @@ struct view_data_ha_switch_data {
     int     value;
 };
 
+/* HA WebSocket client connection status (values: ha_ws_status_t, ha_ws.h).
+ * Payload of VIEW_EVENT_HA_WS_STATUS; the status screen re-reads the full
+ * ha_ws_status_get() snapshot, so only the status value travels here. */
+struct view_data_ha_ws_status {
+    uint8_t status;
+};
+
 /* Sensor-history window. Sized to the trends chart's on-screen point budget;
  * shared by the ha_history ring buffer and the VIEW_EVENT_HA_HISTORY payload. */
 #define HA_HISTORY_MAX_SAMPLES 120
@@ -218,7 +226,10 @@ enum {
     /* P: ha/ha_mqtt.c  C: ha/ha_config.c  Payload: NULL */
     VIEW_EVENT_HA_ADDR_DISPLAY,
 
-    /* P: ha/ha_sensor.c (HA→device values on indicator/display/set)
+    /* P: ha/ha_sensor.c (HA→device values on indicator/display/set);
+     *    ha/ha_ws.c (HA WebSocket subscribe_entities updates — while the WS
+     *    client is enabled it is the sole producer; ha_sensor.c then ignores
+     *    indicator/display/set)
      * C: ha/ha_switch.c (updates the Loft temp card + stat rows, LVGL lock held);
      *    ha/ha_history.c (appends the parsed float to its per-series ring buffer)
      * Payload: struct view_data_ha_sensor_data */
@@ -243,6 +254,12 @@ enum {
      * down / unplugged). Consumer blanks all sensor cards to "N/A". Link
      * recovery is implicit: the next VIEW_EVENT_SENSOR_DATA repaints values. */
     VIEW_EVENT_RP2040_STALE,
+
+    /* P: ha/ha_ws.c (on every WS client state transition)
+     * C: ha/ha_ws_status_screen.c (refreshes the settings status modal)
+     * Payload: struct view_data_ha_ws_status
+     * LVGL: lock required — consumer runs in view_event_task. */
+    VIEW_EVENT_HA_WS_STATUS,
 
     VIEW_EVENT_ALL,
 };
