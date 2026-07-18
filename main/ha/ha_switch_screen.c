@@ -346,25 +346,33 @@ static void _create_all_lights_card(lv_obj_t *tile, switch_slot_t *slot, int32_t
 
 static lv_obj_t *s_ha_display_value[CONFIG_HA_DISPLAY_VALUE_NUM];
 
+static const char *const display_units[CONFIG_HA_DISPLAY_VALUE_NUM] = {
+    CONFIG_HA_TEMP_UI_UNIT,
+    CONFIG_HA_HUMIDITY_UI_UNIT,
+    CONFIG_HA_CO2_UI_UNIT,
+};
+
 void ha_switch_screen_set_ha_value(int index, const char *value)
 {
     /* Caller holds the LVGL lock (ha_switch.c event handler). */
     if (index < 0 || index >= CONFIG_HA_DISPLAY_VALUE_NUM || value == NULL) {
         return;
     }
-    if (s_ha_display_value[index] != NULL) {
-        if (index == 1) {
-            /* Humidity renders inline with its unit. */
-            char buf[40];
-            lv_snprintf(buf, sizeof(buf), "%s %%", value);
-            lv_label_set_text(s_ha_display_value[index], buf);
-        } else {
-            lv_label_set_text(s_ha_display_value[index], value);
-        }
+    if (s_ha_display_value[index] == NULL) {
+        return;
+    }
+    if (index == 0) {
+        /* Temperature card renders the unit as its own label. */
+        lv_label_set_text(s_ha_display_value[index], value);
+    } else {
+        /* Stat rows render value and unit inline. */
+        char buf[48];
+        lv_snprintf(buf, sizeof(buf), "%s %s", value, display_units[index]);
+        lv_label_set_text(s_ha_display_value[index], buf);
     }
 }
 
-static void _create_loft_climate_card(lv_obj_t *tile, switch_slot_t *slot)
+static void _create_loft_temp_card(lv_obj_t *tile, switch_slot_t *slot)
 {
     lv_obj_t *card = lv_obj_create(tile);
     _style_panel(card, CARD_WIDTH, CARD_HEIGHT, 22, 96);
@@ -372,16 +380,12 @@ static void _create_loft_climate_card(lv_obj_t *tile, switch_slot_t *slot)
     /* montserrat_48, not the custom font2: font2 is a numerals-only subset
      * and silently renders nothing for the "--" placeholder. */
     s_ha_display_value[0] = _create_label(card, "--", &lv_font_montserrat_48, 0xECBF41);
-    lv_obj_set_align(s_ha_display_value[0], LV_ALIGN_TOP_MID);
-    lv_obj_set_pos(s_ha_display_value[0], -16, 12);
+    lv_obj_set_align(s_ha_display_value[0], LV_ALIGN_CENTER);
+    lv_obj_set_pos(s_ha_display_value[0], -14, -20);
 
     lv_obj_t *unit = _create_label(card, CONFIG_HA_TEMP_UI_UNIT, &lv_font_montserrat_24, 0xECBF41);
-    lv_obj_set_align(unit, LV_ALIGN_TOP_MID);
-    lv_obj_set_pos(unit, 76, 16);
-
-    s_ha_display_value[1] = _create_label(card, "-- %", &lv_font_montserrat_24, HUMIDITY_ACCENT);
-    lv_obj_set_align(s_ha_display_value[1], LV_ALIGN_TOP_MID);
-    lv_obj_set_y(s_ha_display_value[1], 82);
+    lv_obj_set_align(unit, LV_ALIGN_CENTER);
+    lv_obj_set_pos(unit, 78, -30);
 
     lv_obj_t *name = _create_label(card, CONFIG_HA_TEMP_UI_NAME, &lv_font_montserrat_18, TEXT_MUTED);
     lv_obj_set_align(name, LV_ALIGN_BOTTOM_MID);
@@ -393,22 +397,24 @@ static void _create_loft_climate_card(lv_obj_t *tile, switch_slot_t *slot)
     slot->update = _update_momentary;
 }
 
-static void _create_co2_card(lv_obj_t *tile)
+/* Half-height read-only stat row: muted name left, accented value right.
+ * Two of these stacked with an 8 px gap equal one CARD_HEIGHT, aligning the
+ * right column with the temperature card. */
+static void _create_stat_row(lv_obj_t *tile, int32_t y, const char *name_text,
+                             uint32_t accent, int value_idx)
 {
     lv_obj_t *card = lv_obj_create(tile);
-    _style_panel(card, CARD_WIDTH, CARD_HEIGHT, 244, 96);
+    _style_panel(card, CARD_WIDTH, ROW_HEIGHT, 244, y);
 
-    s_ha_display_value[2] = _create_label(card, "--", &lv_font_montserrat_48, 0xFFFFFF);
-    lv_obj_set_align(s_ha_display_value[2], LV_ALIGN_TOP_MID);
-    lv_obj_set_pos(s_ha_display_value[2], -14, 12);
+    lv_obj_t *name = _create_label(card, name_text, &lv_font_montserrat_18, TEXT_MUTED);
+    lv_obj_set_align(name, LV_ALIGN_LEFT_MID);
+    lv_obj_set_x(name, 16);
 
-    lv_obj_t *unit = _create_label(card, CONFIG_HA_CO2_UI_UNIT, &lv_font_montserrat_18, TEXT_MUTED);
-    lv_obj_set_align(unit, LV_ALIGN_TOP_MID);
-    lv_obj_set_pos(unit, 74, 32);
-
-    lv_obj_t *name = _create_label(card, CONFIG_HA_CO2_UI_NAME, &lv_font_montserrat_18, TEXT_MUTED);
-    lv_obj_set_align(name, LV_ALIGN_BOTTOM_MID);
-    lv_obj_set_y(name, -5);
+    char placeholder[48];
+    lv_snprintf(placeholder, sizeof(placeholder), "-- %s", display_units[value_idx]);
+    s_ha_display_value[value_idx] = _create_label(card, placeholder, &lv_font_montserrat_24, accent);
+    lv_obj_set_align(s_ha_display_value[value_idx], LV_ALIGN_RIGHT_MID);
+    lv_obj_set_x(s_ha_display_value[value_idx], -16);
 }
 
 static void _create_slider_card(lv_obj_t *tile, switch_slot_t *slot)
@@ -466,8 +472,11 @@ static void _create_ctrl_tile(ha_switch_screen_t *s, lv_obj_t *tile)
 {
     _create_header(tile, "Loft Controls");
 
-    _create_loft_climate_card(tile, &s->slots[4]);
-    _create_co2_card(tile);
+    _create_loft_temp_card(tile, &s->slots[4]);
+    /* Right column: two half-height stat rows aligned with the temp card
+     * (96..174 and 182..260 vs the card's 96..260). */
+    _create_stat_row(tile, 96, CONFIG_HA_HUMIDITY_UI_NAME, HUMIDITY_ACCENT, 1);
+    _create_stat_row(tile, 182, CONFIG_HA_CO2_UI_NAME, 0xFFFFFF, 2);
     _create_embedded_switch(tile, &s->slots[6], 22, 268, 60, 28);
     _create_slider_card(tile, &s->slots[7]);
 }
