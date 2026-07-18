@@ -436,7 +436,9 @@ static void _ping_start(void) {
 	esp_netif_ip_info_t ip_info = {0};
 	if(netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK && ip_info.gw.addr != 0)
 	{
-		ip_addr_set_ip4_u32(&target_addr, ip_info.gw.addr);
+		/* By-value variant: the pointer form's internal if(ipaddr) trips
+		 * GCC 12+ -Waddress (always-true address of a local) under -Wall. */
+		ip_addr_set_ip4_u32_val(target_addr, ip_info.gw.addr);
 	}
 	else
 	{
