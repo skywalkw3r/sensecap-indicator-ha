@@ -17,10 +17,12 @@ int indicator_model_init(void) {
 #endif
 
 #ifdef RP2040_H
-	esp32_rp2040_init();
+	// Create the sensor-cache mutex before starting the RP2040 UART task, which
+	// can otherwise consume an early packet and hit xSemaphoreTake(NULL).
 	#ifdef SENSOR_H
 	indicator_sensor_init();
 	#endif
+	esp32_rp2040_init();
 #endif
 
 #ifdef CMD_H

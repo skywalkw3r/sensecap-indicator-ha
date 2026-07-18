@@ -218,6 +218,12 @@ enum {
     /* P: ha/ha_switch.c  C: ha/ha_switch.c (internal loop)  Payload: struct view_data_ha_switch_data */
     VIEW_EVENT_HA_SWITCH_SET,
 
+    /* P: rp2040/rp2040.c  C: sensor/sensor_view.c  Payload: NULL
+     * Posted once when the RP2040 UART link is silent for >15s (co-processor
+     * down / unplugged). Consumer blanks all sensor cards to "N/A". Link
+     * recovery is implicit: the next VIEW_EVENT_SENSOR_DATA repaints values. */
+    VIEW_EVENT_RP2040_STALE,
+
     VIEW_EVENT_ALL,
 };
 

@@ -24,9 +24,9 @@ REQUIRED_VALUES = {
     "PKT_TYPE_SENSOR_SHT41_TEMP": 0xB3,
     "PKT_TYPE_SENSOR_SHT41_HUMIDITY": 0xB4,
     "PKT_TYPE_SENSOR_SGP40_TVOC_INDEX": 0xB5,
-    "PKT_TYPE_SENSOR_ATTACHED": 0xB8,
-    "PKT_TYPE_SENSOR_DETACHED": 0xB9,
-    "PKT_TYPE_SENSOR_VALUE": 0xBA,
+    "PKT_TYPE_SENSOR_ATTACHED": 0xC1,
+    "PKT_TYPE_SENSOR_DETACHED": 0xC2,
+    "PKT_TYPE_SENSOR_VALUE": 0xC3,
     "PKT_SENSOR_ID_AHT20_TEMP": 0,
     "PKT_SENSOR_ID_AHT20_HUMIDITY": 1,
     "PKT_SENSOR_ID_SCD41_CO2": 2,
@@ -56,6 +56,26 @@ def parse_int(value: str) -> int:
     return int(value.strip(), 0)
 
 
+def parse_enum_members(text: str) -> list[tuple[str, int]]:
+    """Return (name, value) for every PKT_* enum member, in source order."""
+    members: list[tuple[str, int]] = []
+    for enum_match in re.finditer(r"enum\s+[A-Za-z0-9_]*\s*\{(.*?)\};", text, flags=re.S):
+        current = -1
+        for entry in enum_match.group(1).split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            assign = re.match(r"(PKT_[A-Za-z0-9_]+)\s*(?:=\s*([xXa-fA-F0-9]+))?$", entry)
+            if assign is None:
+                continue
+            if assign.group(2) is not None:
+                current = parse_int(assign.group(2))
+            else:
+                current += 1
+            members.append((assign.group(1), current))
+    return members
+
+
 def parse_constants(path: Path) -> dict[str, int]:
     text = strip_comments(path.read_text())
     constants: dict[str, int] = {}
@@ -63,22 +83,27 @@ def parse_constants(path: Path) -> dict[str, int]:
     for match in re.finditer(r"#define\s+(PKT_[A-Z0-9_]+)\s+([xXa-fA-F0-9]+)", text):
         constants[match.group(1)] = parse_int(match.group(2))
 
-    for enum_match in re.finditer(r"enum\s+[A-Za-z0-9_]*\s*\{(.*?)\};", text, flags=re.S):
-        current = -1
-        for entry in enum_match.group(1).split(","):
-            entry = entry.strip()
-            if not entry:
-                continue
-            assign = re.match(r"(PKT_[A-Z0-9_]+)\s*(?:=\s*([xXa-fA-F0-9]+))?$", entry)
-            if assign is None:
-                continue
-            if assign.group(2) is not None:
-                current = parse_int(assign.group(2))
-            else:
-                current += 1
-            constants[assign.group(1)] = current
+    for name, value in parse_enum_members(text):
+        constants[name] = value
 
     return constants
+
+
+def find_duplicate_enum_values(path: Path) -> list[str]:
+    """Report packet-type values assigned to more than one enum constant.
+
+    Only enum members are checked; the PKT_SENSOR_ID_*/PKT_SENSOR_CAT_* #defines
+    intentionally reuse small integers and live in a separate namespace.
+    """
+    by_value: dict[int, list[str]] = {}
+    for name, value in parse_enum_members(strip_comments(path.read_text())):
+        by_value.setdefault(value, []).append(name)
+
+    dups: list[str] = []
+    for value, names in sorted(by_value.items()):
+        if len(names) > 1:
+            dups.append(f"0x{value:02X} shared by {', '.join(names)}")
+    return dups
 
 
 def main() -> int:
@@ -96,6 +121,10 @@ def main() -> int:
 
         if name in esp32 and name in rp2040 and esp32[name] != rp2040[name]:
             errors.append(f"mismatch {name}: ESP32=0x{esp32[name]:02X}, RP2040=0x{rp2040[name]:02X}")
+
+    for label, path in (("ESP32", ESP32_HEADER), ("RP2040", RP2040_HEADER)):
+        for dup in find_duplicate_enum_values(path):
+            errors.append(f"{label} duplicate packet-type value {dup}")
 
     if errors:
         print("Protocol verification failed:")

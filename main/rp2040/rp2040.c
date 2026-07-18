@@ -29,6 +29,13 @@ static const char* TAG = "esp32_rp2040";
 static uint8_t buf[BUF_SIZE];
 static uint8_t data[BUF_SIZE];
 
+// RP2040 link staleness: if no valid packet arrives within this window the
+// co-processor is treated as down and the sensor UI is blanked to "N/A".
+#define RP2040_LINK_STALE_TIMEOUT_MS (15000)
+static TickType_t s_last_rx_tick;      // tick of the last valid packet
+static TickType_t s_last_poweron_tick; // tick of the last POWER_ON (re)send
+static bool s_link_stale;              // true while the link is considered down
+
 /**
  * @brief sensor data parse
  * @attention should be implemented in indicator_sensor_model.c
@@ -176,6 +183,9 @@ static void esp32_rp2040_comm_task(void* arg) {
 								 ESP32_RP2040_RTS, ESP32_RP2040_CTS));
 
 	_cmd_send(PKT_TYPE_CMD_POWER_ON, NULL, 0);
+	s_last_rx_tick = xTaskGetTickCount();
+	s_last_poweron_tick = s_last_rx_tick;
+	s_link_stale = false;
 	cobs_decode_result ret;
 	uint8_t frag[BUF_SIZE] = {0};
 	size_t frag_len = 0;
@@ -245,13 +255,42 @@ static void esp32_rp2040_comm_task(void* arg) {
 #endif
 						if(ret.status == COBS_DECODE_OK)
 						{
-							_packet_handle((uint8_t*)data, ret.out_len);
+							if(_packet_handle((uint8_t*)data, ret.out_len))
+							{
+								// Valid packet => link is alive. Recovery is implicit:
+								// later sensor packets repaint cards via VIEW_EVENT_SENSOR_DATA.
+								s_last_rx_tick = xTaskGetTickCount();
+								s_link_stale = false;
+							}
 						}
 					}
 					frag_len = 0;
 				}
 
 				p_buf_start = (p_buf_end < p_buf_stop) ? (p_buf_end + 1) : p_buf_stop; // next message
+			}
+		}
+
+		// Link staleness watchdog: runs every loop iteration because
+		// uart_read_bytes returns at least every 20 ms. Post one event on the
+		// down-edge; re-send POWER_ON at most once per stale window in case the
+		// RP2040 missed the boot-time command.
+		TickType_t now = xTaskGetTickCount();
+		if((now - s_last_rx_tick) > pdMS_TO_TICKS(RP2040_LINK_STALE_TIMEOUT_MS))
+		{
+			if(!s_link_stale)
+			{
+				s_link_stale = true;
+				ESP_LOGW(TAG, "RP2040 link stale: no valid packet for >%d ms",
+				         RP2040_LINK_STALE_TIMEOUT_MS);
+				esp_event_post_to(view_event_handle, VIEW_EVENT_BASE,
+				                  VIEW_EVENT_RP2040_STALE, NULL, 0, 0);
+			}
+			if((now - s_last_poweron_tick) >= pdMS_TO_TICKS(RP2040_LINK_STALE_TIMEOUT_MS))
+			{
+				s_last_poweron_tick = now;
+				_cmd_send(PKT_TYPE_CMD_POWER_ON, NULL, 0);
+				ESP_LOGW(TAG, "re-sent PKT_TYPE_CMD_POWER_ON to RP2040");
 			}
 		}
 	}
