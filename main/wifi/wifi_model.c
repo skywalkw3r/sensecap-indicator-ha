@@ -6,6 +6,7 @@
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -34,6 +35,24 @@ static int s_retry_num = 0;
 static int wifi_retry_max = 3;
 static bool _g_ping_done = true;
 
+/* ── Async AP scan state ──────────────────────────────────────────────────
+ * The scan is started non-blocking (esp_wifi_scan_start with block=false) from
+ * the view-event loop and finished on the default Wi-Fi event loop via
+ * WIFI_EVENT_SCAN_DONE, so the shared UI/data bus never blocks for the 2-4s a
+ * scan takes. _g_scan_in_progress gates overlapping requests; it is a plain
+ * flag (like _g_ping_done above) because scan requests serialise on the view
+ * loop and only the completion paths clear it, so no lock is required. The
+ * guard timer recovers the flag if SCAN_DONE never arrives (_wifi_scan_guard_cb).
+ *
+ * Guard timeout: IDF v5.4 posts exactly one WIFI_EVENT_SCAN_DONE per successful
+ * esp_wifi_scan_start(), so the happy path never needs the timer. It only fires
+ * if the scan is torn down without a SCAN_DONE — e.g. the connect path calls
+ * esp_wifi_stop() while a scan is still in flight. 8s is comfortably above the
+ * ~2-4s a 2.4GHz active scan takes. */
+#define WIFI_SCAN_GUARD_TIMEOUT_US (8 * 1000 * 1000)
+static bool _g_scan_in_progress = false;
+static esp_timer_handle_t _g_scan_guard_timer = NULL;
+
 static EventGroupHandle_t _wifi_event_group;
 
 static const char* TAG = "wifi-model";
@@ -54,6 +73,141 @@ static void _wifi_st_get(struct view_data_wifi_st* p_st) {
 	xSemaphoreGive(_g_data_mutex);
 }
 
+/* Build the AP-list payload (current connection + deduped scan records) and
+ * publish VIEW_EVENT_WIFI_LIST. The view hides its scan spinner when this event
+ * arrives, so EVERY terminal scan outcome — success, empty, or failure — must
+ * call this or the UI strands a spinner. Pass ap_count == 0 to publish a list
+ * carrying only the current connection (used on the failure / guard paths). */
+static void _wifi_list_post(const wifi_ap_record_t* p_ap_info, uint16_t ap_count) {
+	struct view_data_wifi_st st;
+
+	/* HEAP, not stack: callers run on the default event loop task (SCAN_DONE)
+	 * and the esp_timer task (scan guard), both with small stacks that cannot
+	 * hold the ~640-byte list payload. esp_event_post_to copies the payload,
+	 * so freeing after the post is safe. */
+	struct view_data_wifi_list* list = calloc(1, sizeof(struct view_data_wifi_list));
+	if(list == NULL)
+	{
+		ESP_LOGE(TAG, "no memory for wifi list payload");
+		return;
+	}
+
+	_wifi_st_get(&st);
+
+	list->is_connect = st.is_connected;
+	if(st.is_connected)
+	{
+		strlcpy((char*)list->connect.ssid, (char*)st.ssid, sizeof(list->connect.ssid));
+		list->connect.auth_mode = false;
+		list->connect.rssi = st.rssi;
+	}
+
+	bool is_exist = false;
+	int list_cnt = 0;
+	for(int i = 0; i < ap_count; i++)
+	{
+		is_exist = false;
+		for(int j = 0; j < list_cnt; j++)
+		{
+			if(strcmp(list->aps[j].ssid, p_ap_info[i].ssid) == 0)
+			{
+				ESP_LOGI(TAG, "list exit ap:%s", p_ap_info[i].ssid);
+				is_exist = true;
+				break;
+			}
+		}
+		if(!is_exist)
+		{
+			strcpy(list->aps[list_cnt].ssid, p_ap_info[i].ssid);
+			list->aps[list_cnt].rssi = p_ap_info[i].rssi;
+			list->aps[list_cnt].auth_mode = (p_ap_info[i].authmode != WIFI_AUTH_OPEN);
+			list_cnt++;
+		}
+	}
+	list->cnt = list_cnt;
+	esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST, list,
+					  sizeof(struct view_data_wifi_list), portMAX_DELAY);
+	free(list);
+}
+
+/* Read the just-completed scan's records from the driver and publish them.
+ * esp_wifi_scan_get_ap_records() also releases the driver's internal AP list,
+ * so it must run once per scan. Errors degrade to an empty list rather than
+ * aborting — the old blocking path ESP_ERROR_CHECK'd here, which would panic
+ * the device on a transient get-records failure. */
+static void _wifi_scan_publish_records(void) {
+	uint16_t number = WIFI_SCAN_LIST_SIZE;
+	uint16_t ap_count = 0;
+
+	/* HEAP, not stack: this runs on the default event loop task, whose stack
+	 * (ESP_SYSTEM_EVENT_TASK_STACK_SIZE, 2304 bytes by default) cannot hold
+	 * the ~1.2 KB record array. Static-once callees get inlined into
+	 * _wifi_event_handler, so a stack array here would be allocated on EVERY
+	 * wifi event dispatch and overflow the task stack at first dispatch. */
+	wifi_ap_record_t* ap_info = calloc(WIFI_SCAN_LIST_SIZE, sizeof(wifi_ap_record_t));
+	if(ap_info == NULL)
+	{
+		ESP_LOGE(TAG, "no memory for scan records");
+		_wifi_list_post(NULL, 0);
+		return;
+	}
+
+	if(esp_wifi_scan_get_ap_num(&ap_count) != ESP_OK)
+	{
+		ap_count = 0;
+	}
+	if(esp_wifi_scan_get_ap_records(&number, ap_info) != ESP_OK)
+	{
+		number = 0;
+	}
+	ESP_LOGI(TAG, "Total APs scanned = %u, actual AP number ap_info holds = %u", ap_count, number);
+
+	_wifi_list_post(ap_info, min(number, ap_count));
+	free(ap_info);
+}
+
+/* One-shot recovery for a scan that never reports completion. If SCAN_DONE is
+ * absent (e.g. esp_wifi_stop() in the connect path aborted an in-flight scan),
+ * clear the in-flight flag and unstick the view so future scans can run and the
+ * spinner is hidden. Runs on the esp_timer task. */
+static void _wifi_scan_guard_cb(void* arg) {
+	if(!_g_scan_in_progress)
+	{
+		return;
+	}
+	ESP_LOGW(TAG, "scan guard fired: no SCAN_DONE within timeout, recovering");
+	_g_scan_in_progress = false;
+	esp_wifi_scan_stop();
+	_wifi_list_post(NULL, 0);
+}
+
+/* Kick off a non-blocking AP scan and return immediately; results arrive later
+ * on the default Wi-Fi event loop as WIFI_EVENT_SCAN_DONE. A second request
+ * while one is in flight is ignored (no overlapping scans). A rejected start
+ * (e.g. ESP_ERR_WIFI_STATE while a connect is in progress) still publishes a
+ * list so the view's spinner is cleared. */
+static void _wifi_scan_start(void) {
+	if(_g_scan_in_progress)
+	{
+		ESP_LOGW(TAG, "scan already in progress, ignoring request");
+		return;
+	}
+
+	/* Mark in-flight and arm the guard BEFORE starting, so a scan that
+	 * completes immediately cannot race the flag into a stuck state. */
+	_g_scan_in_progress = true;
+	esp_timer_start_once(_g_scan_guard_timer, WIFI_SCAN_GUARD_TIMEOUT_US);
+
+	esp_err_t err = esp_wifi_scan_start(NULL, false);
+	if(err != ESP_OK)
+	{
+		ESP_LOGW(TAG, "esp_wifi_scan_start failed: %s", esp_err_to_name(err));
+		esp_timer_stop(_g_scan_guard_timer);
+		_g_scan_in_progress = false;
+		_wifi_list_post(NULL, 0);
+	}
+}
+
 static void _wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
 	switch(event_id)
 	{
@@ -69,6 +223,16 @@ static void _wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t 
 			_wifi_st_set(&st);
 
 			esp_wifi_connect();
+			break;
+		}
+		case WIFI_EVENT_SCAN_DONE:
+		{
+			ESP_LOGI(TAG, "wifi event: WIFI_EVENT_SCAN_DONE");
+			/* Disarm the guard (harmless no-op if it already fired), then
+			 * publish results — this runs off the old blocking scan path. */
+			esp_timer_stop(_g_scan_guard_timer);
+			_g_scan_in_progress = false;
+			_wifi_scan_publish_records();
 			break;
 		}
 		case WIFI_EVENT_STA_CONNECTED:
@@ -140,21 +304,6 @@ static void _ip_event_handler(void* arg, esp_event_base_t event_base, int32_t ev
 
 		xSemaphoreGive(_g_net_check_sem);
 	}
-}
-
-static int _wifi_scan(wifi_ap_record_t* p_ap_info, uint16_t number) {
-	uint16_t ap_count;
-	esp_wifi_scan_start(NULL, true);
-
-	ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-	ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, p_ap_info));
-	ESP_LOGI(TAG, "Total APs scanned = %u, actual AP number ap_info holds = %u", ap_count, number);
-
-	for(int i = 0; (i < number) && (i < ap_count); i++)
-	{
-		ESP_LOGI(TAG, "SSID: %s, RSSI:%d, Channel: %d", p_ap_info[i].ssid, p_ap_info[i].rssi, p_ap_info[i].primary);
-	}
-	return ap_count;
 }
 
 static int _wifi_connect(const char* p_ssid, const char* p_password, int retry_num) {
@@ -345,55 +494,9 @@ static void _view_event_handler(void* handler_args, esp_event_base_t base, int32
 		case VIEW_EVENT_WIFI_LIST_REQ:
 		{
 			ESP_LOGI(TAG, "event: VIEW_EVENT_WIFI_LIST_REQ");
-
-			uint16_t number = WIFI_SCAN_LIST_SIZE;
-			uint16_t ap_count = 0;
-			wifi_ap_record_t ap_info[WIFI_SCAN_LIST_SIZE];
-			ap_count = _wifi_scan(ap_info, number);
-
-			struct view_data_wifi_list list;
-			struct view_data_wifi_st st;
-
-			memset(&list, 0, sizeof(struct view_data_wifi_list));
-
-			_wifi_st_get(&st);
-
-			list.is_connect = st.is_connected;
-			if(st.is_connected)
-			{
-				strlcpy((char*)list.connect.ssid, (char*)st.ssid, sizeof(list.connect.ssid));
-				list.connect.auth_mode = false;
-				list.connect.rssi = st.rssi;
-			}
-
-			ap_count = min(number, ap_count);
-
-			bool is_exist = false;
-			int list_cnt = 0;
-			for(int i = 0; i < ap_count; i++)
-			{
-				is_exist = false;
-				for(int j = 0; j < list_cnt; j++)
-				{
-					if(strcmp(list.aps[j].ssid, ap_info[i].ssid) == 0)
-					{
-						ESP_LOGI(TAG, "list exit ap:%s", ap_info[i].ssid);
-						is_exist = true;
-						break;
-					}
-				}
-				if(!is_exist)
-				{
-					strcpy(list.aps[list_cnt].ssid, ap_info[i].ssid);
-					list.aps[list_cnt].rssi = ap_info[i].rssi;
-					list.aps[list_cnt].auth_mode = (ap_info[i].authmode != WIFI_AUTH_OPEN);
-					list_cnt++;
-				}
-			}
-			list.cnt = list_cnt;
-			esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_LIST, &list,
-							  sizeof(struct view_data_wifi_list), portMAX_DELAY);
-
+			/* Non-blocking: kick the scan and return so the shared event bus
+			 * keeps flowing. The result is posted from WIFI_EVENT_SCAN_DONE. */
+			_wifi_scan_start();
 			break;
 		}
 		case VIEW_EVENT_WIFI_CONNECT:
@@ -432,6 +535,12 @@ int indicator_wifi_model_init(void) {
 	_g_wifi_mutex = xSemaphoreCreateMutex();
 	_g_data_mutex = xSemaphoreCreateMutex();
 	_g_net_check_sem = xSemaphoreCreateBinary();
+
+	const esp_timer_create_args_t scan_guard_args = {
+		.callback = &_wifi_scan_guard_cb,
+		.name = "wifi_scan_guard",
+	};
+	ESP_ERROR_CHECK(esp_timer_create(&scan_guard_args, &_g_scan_guard_timer));
 
 	memset(&_g_wifi_model, 0, sizeof(_g_wifi_model));
 
