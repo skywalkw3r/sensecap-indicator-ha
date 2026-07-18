@@ -134,6 +134,10 @@ static void _mqtt_ha_start(instance_mqtt *instance)
     }
 
     instance->mqtt_cfg = (esp_mqtt_client_config_t *)malloc(sizeof(esp_mqtt_client_config_t));
+    if (instance->mqtt_cfg == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate MQTT client configuration");
+        return;
+    }
     *instance->mqtt_cfg = (esp_mqtt_client_config_t){
         .broker.address.uri = hf_cfg.broker_url,
         .credentials.client_id = hf_cfg.client_id,

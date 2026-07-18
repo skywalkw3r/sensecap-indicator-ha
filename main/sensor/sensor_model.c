@@ -139,7 +139,7 @@ SensorData* get_current_sensor_data(SensorData* data, enum sensor_data_type type
  * @param len
  * @return int
  */
-int _sensor_data_parse_handle(uint8_t* p_data, ssize_t len) {
+int _sensor_data_parse_handle(uint8_t* p_data, size_t len) {
 	if(len < sizeof(float) + 1) // Length check
 	{
 		// Handle error or return

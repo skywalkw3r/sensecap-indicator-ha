@@ -60,7 +60,7 @@ static void publish_switch_state(const struct view_data_ha_switch_data *switch_d
     static const char *switch_keys[] = CONFIG_SWITCH_VALUE_KEYS;
     static const char *switch_topics[] = CONFIG_SWITCH_TOPICS_STATE;
 
-    if (switch_data->index >= 0 && switch_data->index < CONFIG_HA_SWITCH_ENTITY_NUM) {
+    if (switch_data->index < CONFIG_HA_SWITCH_ENTITY_NUM) {
         char data_buf[MAX_DATA_BUF_LEN];
         int len = snprintf(data_buf, sizeof(data_buf), "{\"%s\": %d}", switch_keys[switch_data->index], (int)switch_data->value);
 

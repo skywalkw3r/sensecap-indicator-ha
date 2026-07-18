@@ -17,6 +17,8 @@ extern "C" {
 #endif
 
 #include "view_data.h"
+#include <stddef.h>
+
 enum pkt_type_cmd
 {
 	PKT_TYPE_NONE = 0,
@@ -82,6 +84,15 @@ enum pkt_type_data
 #define PKT_SENSOR_CAT_UNKNOWN 255
 
 void esp32_rp2040_init(void);
+
+/**
+ * @brief Parse sensor data received from the RP2040.
+ *
+ * The weak default lives in rp2040.c; the strong implementation is provided by
+ * sensor/sensor_model.c. Declared here — the shared header both translation
+ * units include — so they cannot drift out of signature again.
+ */
+int _sensor_data_parse_handle(uint8_t* p_data, size_t len);
 
 #ifdef __cplusplus
 } /*extern "C"*/

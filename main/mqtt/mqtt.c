@@ -28,7 +28,7 @@ static void _wifi_event_handler(void *handler_args, esp_event_base_t base, int32
     }
 }
 
-static void mqtt_start_interface(const instance_mqtt *instance, enum MQTT_APP_EVENT flag) {
+static void mqtt_start_interface(instance_mqtt *instance, enum MQTT_APP_EVENT flag) {
     if (!mqtt_net_flag || !instance || !instance->mqtt_name || !instance->mqtt_starter) {
         ESP_LOGE(TAG, "Cannot start MQTT: %s",
                  !mqtt_net_flag ? "No network" : "Invalid instance");

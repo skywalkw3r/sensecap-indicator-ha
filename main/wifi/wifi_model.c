@@ -1,6 +1,8 @@
 #include "wifi_model.h"
 #include "esp_log.h"
 
+#include <inttypes.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "esp_system.h"
@@ -33,8 +35,6 @@ static SemaphoreHandle_t _g_net_check_sem;
 static int s_retry_num = 0;
 static int wifi_retry_max = 3;
 static bool _g_ping_done = true;
-
-static EventGroupHandle_t _wifi_event_group;
 
 static const char* TAG = "wifi-model";
 
@@ -252,7 +252,7 @@ static void _ping_end(esp_ping_handle_t hdl, void* args) {
 	{
 		printf("\n--- %s ping statistics ---\n", inet6_ntoa(*ip_2_ip6(&target_addr)));
 	}
-	printf("%d packets transmitted, %d received, %d%% packet loss, time %dms\n", transmitted, received, loss,
+	printf("%" PRIu32 " packets transmitted, %" PRIu32 " received, %" PRIu32 "%% packet loss, time %" PRIu32 "ms\n", transmitted, received, loss,
 		   total_time_ms);
 
 	esp_ping_delete_session(hdl);
@@ -375,7 +375,7 @@ static void _view_event_handler(void* handler_args, esp_event_base_t base, int32
 				is_exist = false;
 				for(int j = 0; j < list_cnt; j++)
 				{
-					if(strcmp(list.aps[j].ssid, ap_info[i].ssid) == 0)
+					if(strcmp(list.aps[j].ssid, (char*)ap_info[i].ssid) == 0)
 					{
 						ESP_LOGI(TAG, "list exit ap:%s", ap_info[i].ssid);
 						is_exist = true;
@@ -384,7 +384,7 @@ static void _view_event_handler(void* handler_args, esp_event_base_t base, int32
 				}
 				if(!is_exist)
 				{
-					strcpy(list.aps[list_cnt].ssid, ap_info[i].ssid);
+					strcpy(list.aps[list_cnt].ssid, (char*)ap_info[i].ssid);
 					list.aps[list_cnt].rssi = ap_info[i].rssi;
 					list.aps[list_cnt].auth_mode = (ap_info[i].authmode != WIFI_AUTH_OPEN);
 					list_cnt++;
@@ -403,7 +403,7 @@ static void _view_event_handler(void* handler_args, esp_event_base_t base, int32
 
 			if(p_cfg->have_password)
 			{
-				_wifi_connect(p_cfg->ssid, p_cfg->password, 3);
+				_wifi_connect(p_cfg->ssid, (char*)p_cfg->password, 3);
 			}
 			else
 			{

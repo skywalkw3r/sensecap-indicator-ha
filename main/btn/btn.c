@@ -16,10 +16,12 @@ static const char *TAG = "btn";
 
 __attribute__((weak)) int indicator_display_off(void) {
     ESP_LOGI(TAG, "indicator_display_off");
+    return 0;
 }
 
 __attribute__((weak)) int indicator_display_on(void) {
     ESP_LOGI(TAG, "indicator_display_on");
+    return 0;
 }
 
 __attribute__((weak)) bool indicator_display_st_get(void) {

@@ -301,4 +301,5 @@ int indicator_display_on(void) {
 int indicator_display_off(void) {
 	_lcd_bl_off();
 	_timer_stop();
+	return 0;
 }

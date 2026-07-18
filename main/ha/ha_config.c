@@ -315,7 +315,7 @@ static void view_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 esp_err_t ha_cfg_get(ha_cfg_interface *ha_cfg)
 {
-    int len = sizeof(ha_cfg_interface);
+    size_t len = sizeof(ha_cfg_interface);
     memset(ha_cfg, 0, sizeof(ha_cfg_interface));
     esp_err_t err = indicator_nvs_read(MQTT_HA_CFG_STORAGE, ha_cfg, &len);
     if (err == ESP_OK && len == sizeof(ha_cfg_interface)) {

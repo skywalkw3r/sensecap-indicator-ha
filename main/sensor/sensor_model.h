@@ -2,7 +2,6 @@
 #define SENSOR_MODEL_H
 
 #include <stdint.h>
-#include <sys/types.h>
 
 #include "rp2040.h"
 #include "view_data.h"
@@ -42,7 +41,6 @@ SensorData* get_current_sensor_data(SensorData* data, enum sensor_data_type type
 const char* get_sensor_name(const enum sensor_data_type type);
 float get_sensor_float_value(const enum sensor_data_type type);
 int get_sensor_int_value(const enum sensor_data_type type);
-int _sensor_data_parse_handle(uint8_t* p_data, ssize_t len);
 
 #ifdef __cplusplus
 } /*extern "C"*/
