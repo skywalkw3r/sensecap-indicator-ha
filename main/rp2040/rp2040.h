@@ -44,11 +44,6 @@ enum pkt_type_data
 	// Inner Sensor SGP40
 	PKT_TYPE_SENSOR_SGP40_TVOC_INDEX = 0xB5, // float
 
-	// Dynamic sensor registry packets.
-	PKT_TYPE_SENSOR_ATTACHED = 0xB8,
-	PKT_TYPE_SENSOR_DETACHED = 0xB9,
-	PKT_TYPE_SENSOR_VALUE = 0xBA,
-
 	// SEN5x
 	PKT_TYPE_SENSOR_SEN5X_massConcentrationPm1p0 = 0xB6,
 	PKT_TYPE_SENSOR_SEN5X_massConcentrationPm2p5 = 0xB7,
@@ -63,6 +58,13 @@ enum pkt_type_data
 	PKT_TYPE_SENSOR_SFA3X_HCHO = 0xBE,
 	PKT_TYPE_SENSOR_SFA3X_HUMIDITY = 0xBF,
 	PKT_TYPE_SENSOR_SFA3X_TEMP = 0xC0,
+
+	// Dynamic sensor registry packets (v2.x). Own range above the legacy /
+	// SEN5x / SFA3X block to avoid packet-type collisions. Keep byte-identical
+	// with rp2040/include/indicator_rp2040.hpp.
+	PKT_TYPE_SENSOR_ATTACHED = 0xC1,
+	PKT_TYPE_SENSOR_DETACHED = 0xC2,
+	PKT_TYPE_SENSOR_VALUE = 0xC3,
 };
 
 #define PKT_SENSOR_ID_AHT20_TEMP 0

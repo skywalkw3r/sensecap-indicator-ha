@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "esp_log.h"
+#include <math.h>
 #include <string.h>
 
 #include "sensor_model.h"
@@ -196,7 +197,8 @@ void view_event_update_present_sensorData(void* handler_args, esp_event_base_t b
 static void format_sensor_data(char* buf, enum sensor_data_type sensor_type, const float data) {
 	char* format_style;
 
-	if(data < 0)
+	// NaN is the universal no-data / invalid sentinel for every sensor type.
+	if(isnan(data))
 	{
 		snprintf(buf, BUF_SIZE, "N/A");
 		return;
@@ -205,16 +207,52 @@ static void format_sensor_data(char* buf, enum sensor_data_type sensor_type, con
 	switch(sensor_type)
 	{
 		case SHT41_SENSOR_TEMP:
+			// Sub-zero temperatures are valid; only reject readings below a sane
+			// hardware floor (sensor fault / garbage decode).
+			if(data < -40.0f)
+			{
+				snprintf(buf, BUF_SIZE, "N/A");
+				return;
+			}
 			format_style = "%.1f";
 			break;
 		case SCD41_SENSOR_CO2:
 		case SGP40_SENSOR_TVOC:
 		case SHT41_SENSOR_HUMIDITY:
 		default:
+			// CO2 / tVOC / humidity cannot be negative; treat negatives as invalid.
+			if(data < 0)
+			{
+				snprintf(buf, BUF_SIZE, "N/A");
+				return;
+			}
 			format_style = "%.0f";
 			break;
 	}
-	snprintf(buf, BUF_SIZE, format_style, data); // wrtie to buf
+	snprintf(buf, BUF_SIZE, format_style, data); // write to buf
+}
+
+/**
+ * @brief RP2040 link went stale — blank every sensor card back to "N/A".
+ * @attention consumes VIEW_EVENT_RP2040_STALE (NULL payload); registered in view_sensor_init
+ */
+void view_event_sensor_link_stale(void* handler_args, esp_event_base_t base, int32_t id,
+								  void* event_data) {
+	if(id != VIEW_EVENT_RP2040_STALE)
+		return;
+	lv_port_sem_take();
+	for(int i = 0; i < ENUM_SENSOR_ALL; i++)
+	{
+		if(sensorPanel[i].ui_lbl == NULL)
+		{
+			continue;
+		}
+		for(int j = 0; j < sensorPanel[i].ui_lbl_size; j++)
+		{
+			lv_label_set_text(sensorPanel[i].ui_lbl[j], "N/A");
+		}
+	}
+	lv_port_sem_give();
 }
 
 void view_sensor_init() {
@@ -237,4 +275,8 @@ void view_sensor_init() {
 	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
 		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SENSOR_DATA,
 		view_event_update_present_sensorData, NULL, NULL));
+
+	ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
+		view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_RP2040_STALE,
+		view_event_sensor_link_stale, NULL, NULL));
 }
