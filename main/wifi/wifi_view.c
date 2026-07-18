@@ -154,7 +154,9 @@ static void _on_wifi_icon_clicked(lv_event_t *e) {
 static void _ensure_wifi_status_icon(void) {
     if(s_wifi_icon) return;
 
-    lv_obj_t *tile = nav_get_tile(NAV_TILE_HA_DATA);
+    /* The status icon lives on the home tile — the control page, now that the
+     * sensor data page is gone. */
+    lv_obj_t *tile = nav_get_tile(NAV_TILE_HA_CTRL);
     if(!tile) return;
 
     lv_obj_t *button = lv_button_create(tile);

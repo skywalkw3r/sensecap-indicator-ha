@@ -38,6 +38,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
             instance_ptr->mqtt_connected_flag = true;
             ha_switch_subscribe(client);
+            /* HA→device display topic (indicator/display/set) — distinct from
+             * the device's own publish topic, so no echo loop. */
+            ha_sensor_subscribe(client);
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");

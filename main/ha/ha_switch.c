@@ -143,6 +143,15 @@ static void view_event_handler(void *handler_args, esp_event_base_t base, int32_
             publish_switch_state(p);
             break;
         }
+        case VIEW_EVENT_HA_SENSOR: {
+            /* HA-pushed display value (indicator/display/set → ha_sensor.c).
+             * Currently one consumer: the Bedroom/Loft temperature card. */
+            struct view_data_ha_sensor_data *sensor = (struct view_data_ha_sensor_data *)event_data;
+            lv_port_sem_take();
+            ha_switch_screen_set_ha_temp(sensor->value);
+            lv_port_sem_give();
+            break;
+        }
         default:
             ESP_LOGW(TAG, "Unhandled event: %ld", id);
             break;
@@ -169,6 +178,7 @@ void ha_switch_init(void)
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SWITCH_ST, view_event_handler, NULL, NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SWITCH_SET, view_event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, view_event_handler, NULL, NULL));
 }
 
 void ha_switch_subscribe(esp_mqtt_client_handle_t client)

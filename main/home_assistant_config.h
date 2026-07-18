@@ -39,6 +39,14 @@ extern "C" {
 #define CONFIG_TOPIC_SWITCH_SET                  "indicator/switch/set"
 #define CONFIG_TOPIC_SWITCH_QOS                  1
 
+/* HA -> device display values (this is NOT the device's own sensor publish
+ * topic, so there is no publish/subscribe echo loop). Home Assistant pushes
+ * e.g. {"loft_temp": 72.4} here and the panel renders it read-only. */
+#define CONFIG_TOPIC_DISPLAY_SET                 "indicator/display/set"
+#define CONFIG_HA_TEMP_VALUE_KEY                 "loft_temp"
+#define CONFIG_HA_TEMP_UI_NAME                   "Bedroom / Loft"
+#define CONFIG_HA_TEMP_UI_UNIT                   "°F"
+
 // buildin sensor
 #define CONFIG_SENSOR_BUILDIN_CO2_VALUE_KEY      "co2"
 #define CONFIG_SENSOR_BUILDIN_TVOC_VALUE_KEY     "tvoc"
@@ -102,7 +110,7 @@ extern "C" {
 
 // switch4
 #define CONFIG_SWITCH4_VALUE_KEY                 "switch4"
-#define CONFIG_SWITCH4_UI_NAME                   "Switch4"
+#define CONFIG_SWITCH4_UI_NAME                   "All Lights"
 #define CONFIG_SWITCH4_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
 #define CONFIG_SWITCH4_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
 
@@ -114,19 +122,19 @@ extern "C" {
 
 // switch6
 #define CONFIG_SWITCH6_VALUE_KEY                 "switch6"
-#define CONFIG_SWITCH6_UI_NAME                   "Switch6"
+#define CONFIG_SWITCH6_UI_NAME                   "Xmas Lights"
 #define CONFIG_SWITCH6_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
 #define CONFIG_SWITCH6_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
 
 // switch7
 #define CONFIG_SWITCH7_VALUE_KEY                 "switch7"
-#define CONFIG_SWITCH7_UI_NAME                   "Switch7"
+#define CONFIG_SWITCH7_UI_NAME                   "LED Strip"
 #define CONFIG_SWITCH7_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
 #define CONFIG_SWITCH7_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
 
 // switch8
 #define CONFIG_SWITCH8_VALUE_KEY                 "switch8"
-#define CONFIG_SWITCH8_UI_NAME                   "Switch8"
+#define CONFIG_SWITCH8_UI_NAME                   "Loft Brightness"
 #define CONFIG_SWITCH8_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
 #define CONFIG_SWITCH8_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
 

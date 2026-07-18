@@ -149,33 +149,6 @@ static void _switch_toggle_event_cb(lv_event_t *e)
     _post_switch_value(slot->index, checked ? 1 : 0);
 }
 
-static void _arc_event_cb(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code != LV_EVENT_VALUE_CHANGED && code != LV_EVENT_RELEASED) {
-        return;
-    }
-
-    switch_slot_t *slot = (switch_slot_t *)lv_event_get_user_data(e);
-    if (!slot || !slot->widget) {
-        return;
-    }
-
-    int value = lv_arc_get_value(slot->widget);
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        /* Live label feedback during the drag; defer the post until release. */
-        if (slot->aux) {
-            char buf[32];
-            lv_snprintf(buf, sizeof(buf), "%d °C", value);
-            lv_label_set_text((lv_obj_t *)slot->aux, buf);
-        }
-        return;
-    }
-
-    /* LV_EVENT_RELEASED: publish/save once, when the user lets go. */
-    _post_switch_value(slot->index, value);
-}
-
 static void _slider_event_cb(lv_event_t *e)
 {
     /* Post once on release, not on every VALUE_CHANGED tick during a drag. */
@@ -208,16 +181,14 @@ static void _update_toggle(lv_obj_t *w, int value, void *aux)
      */
 }
 
-static void _update_arc(lv_obj_t *w, int value, void *aux)
+static void _update_momentary(lv_obj_t *w, int value, void *aux)
 {
-    char buf[32];
-
-    lv_snprintf(buf, sizeof(buf), "%d °C", value);
-    if (aux) {
-        lv_label_set_text((lv_obj_t *)aux, buf);
-    }
-    lv_arc_set_value(w, value);
-    /* Silent apply: the label is already set above; no event re-entry. */
+    (void)w;
+    (void)value;
+    (void)aux;
+    /* Momentary/read-only slots: MQTT set/restore messages carry no visual
+     * state to apply (All Lights pulses; the temp card is fed by
+     * VIEW_EVENT_HA_SENSOR, not by the switch protocol). */
 }
 
 static void _update_slider(lv_obj_t *w, int value, void *aux)
@@ -349,7 +320,8 @@ static lv_obj_t *_create_row_toggle(lv_obj_t *tile, switch_slot_t *slot, int32_t
 
     lv_obj_t *icon = lv_image_create(btn);
     lv_image_set_src(icon, icon_off);
-    lv_obj_set_pos(icon, 120, 2);
+    /* Right-aligned so longer labels ("Xmas Lights") don't crowd the icon. */
+    lv_obj_set_pos(icon, 142, 2);
     lv_obj_add_flag(icon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -395,48 +367,121 @@ static lv_obj_t *_create_embedded_switch(lv_obj_t *tile, switch_slot_t *slot, in
     return toggle;
 }
 
-static void _create_arc_card(lv_obj_t *tile, switch_slot_t *slot)
+/* ── All Lights (slot 3 / switch4): momentary action with confirmation ──
+ * Tap → confirm modal → publish switch4:1, then 0 after a short pulse so the
+ * Home Assistant automation always sees a fresh off→on edge to trigger on. */
+
+#define ALL_LIGHTS_ACCENT   0xD9534F
+#define ALL_LIGHTS_PULSE_MS 1200
+
+static lv_obj_t *s_confirm_mbox;
+
+static void _all_lights_pulse_cb(lv_timer_t *timer)
+{
+    (void)timer;
+    /* One-shot LVGL timer (LVGL task context); completes the 1→0 pulse. */
+    _post_switch_value(3, 0);
+}
+
+static void _confirm_mbox_close(void)
+{
+    if (s_confirm_mbox) {
+        lv_msgbox_close(s_confirm_mbox);
+        s_confirm_mbox = NULL;
+    }
+}
+
+static void _all_lights_confirm_cb(lv_event_t *e)
+{
+    (void)e;
+    _confirm_mbox_close();
+    _post_switch_value(3, 1);
+    lv_timer_t *t = lv_timer_create(_all_lights_pulse_cb, ALL_LIGHTS_PULSE_MS, NULL);
+    lv_timer_set_repeat_count(t, 1);
+}
+
+static void _all_lights_cancel_cb(lv_event_t *e)
+{
+    (void)e;
+    _confirm_mbox_close();
+}
+
+static void _all_lights_click_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED || s_confirm_mbox != NULL) {
+        return;
+    }
+
+    lv_obj_t *mbox = lv_msgbox_create(NULL);
+    s_confirm_mbox = mbox;
+    lv_obj_set_style_text_font(mbox, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_msgbox_add_title(mbox, "All Lights");
+    lv_msgbox_add_text(mbox, "Turn off all lights?");
+
+    lv_obj_t *ok = lv_msgbox_add_footer_button(mbox, "Turn Off");
+    lv_obj_set_style_bg_color(ok, lv_color_hex(ALL_LIGHTS_ACCENT), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_add_event_cb(ok, _all_lights_confirm_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *cancel = lv_msgbox_add_footer_button(mbox, "Cancel");
+    lv_obj_add_event_cb(cancel, _all_lights_cancel_cb, LV_EVENT_CLICKED, NULL);
+}
+
+static void _create_all_lights_card(lv_obj_t *tile, switch_slot_t *slot, int32_t x, int32_t y)
+{
+    lv_obj_t *btn = lv_button_create(tile);
+    _style_panel(btn, CARD_WIDTH, CARD_HEIGHT, x, y);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+
+    lv_obj_t *glyph = _create_label(btn, LV_SYMBOL_POWER, &lv_font_montserrat_48, ALL_LIGHTS_ACCENT);
+    lv_obj_set_align(glyph, LV_ALIGN_CENTER);
+    lv_obj_set_y(glyph, -14);
+
+    lv_obj_t *label = _create_label(btn, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
+    lv_obj_set_align(label, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_y(label, -5);
+
+    slot->widget = btn;
+    slot->update = _update_momentary;
+    lv_obj_add_event_cb(btn, _all_lights_click_cb, LV_EVENT_CLICKED, slot);
+}
+
+/* ── Bedroom/Loft temperature (slot 4 / switch5): read-only display ─────
+ * Fed by Home Assistant over CONFIG_TOPIC_DISPLAY_SET → VIEW_EVENT_HA_SENSOR
+ * (see ha_sensor.c); never posts to the switch protocol. */
+
+static lv_obj_t *s_ha_temp_value;
+
+void ha_switch_screen_set_ha_temp(const char *value)
+{
+    /* Caller holds the LVGL lock (ha_switch.c event handler). */
+    if (s_ha_temp_value != NULL && value != NULL) {
+        lv_label_set_text(s_ha_temp_value, value);
+    }
+}
+
+static void _create_ha_temp_card(lv_obj_t *tile, switch_slot_t *slot)
 {
     lv_obj_t *card = lv_obj_create(tile);
     _style_panel(card, CARD_WIDTH, CARD_HEIGHT, 244, 96);
-    lv_obj_remove_flag(card, LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SNAPPABLE |
-                            LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM);
 
-    lv_obj_t *arc = lv_arc_create(card);
-    lv_obj_set_size(arc, 130, 125);
-    lv_obj_set_align(arc, LV_ALIGN_CENTER);
-    lv_obj_add_flag(arc, LV_OBJ_FLAG_FLEX_IN_NEW_TRACK);
-    lv_obj_remove_flag(arc, LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_SCROLLABLE |
-                           LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN);
-    lv_arc_set_value(arc, 70);
-    lv_arc_set_bg_angles(arc, 140, 40);
-    lv_obj_set_style_arc_color(arc, lv_color_hex(ARC_TRACK), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_arc_width(arc, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_all(arc, 0, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_arc_color(arc, lv_color_hex(SWITCH_GREEN), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_arc_width(arc, 8, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_arc_rounded(arc, true, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(arc, lv_color_hex(0xFFFFFF), LV_PART_KNOB | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(arc, LV_OPA_COVER, LV_PART_KNOB | LV_STATE_DEFAULT);
+    /* montserrat_48, not the custom font2: font2 is a numerals-only subset
+     * and silently renders nothing for the "--" placeholder. */
+    s_ha_temp_value = _create_label(card, "--", &lv_font_montserrat_48, 0xECBF41);
+    lv_obj_set_align(s_ha_temp_value, LV_ALIGN_CENTER);
+    lv_obj_set_pos(s_ha_temp_value, -14, -20);
 
-    lv_obj_t *label = _create_label(arc, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
-    lv_obj_set_x(label, 0);
-    lv_obj_set_y(label, -5);
-    lv_obj_set_align(label, LV_ALIGN_BOTTOM_MID);
+    lv_obj_t *unit = _create_label(card, CONFIG_HA_TEMP_UI_UNIT, &lv_font_montserrat_24, 0xECBF41);
+    lv_obj_set_align(unit, LV_ALIGN_CENTER);
+    lv_obj_set_pos(unit, 78, -30);
 
-    lv_obj_t *data = _create_label(arc, "70 °C", &lv_font_montserrat_24, 0xFFFFFF);
-    lv_obj_set_x(data, 0);
-    lv_obj_set_y(data, -50);
-    lv_obj_set_align(data, LV_ALIGN_BOTTOM_MID);
+    lv_obj_t *name = _create_label(card, CONFIG_HA_TEMP_UI_NAME, &lv_font_montserrat_18, TEXT_MUTED);
+    lv_obj_set_align(name, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_y(name, -5);
 
-    slot->widget = arc;
-    slot->aux = data;
-    slot->update = _update_arc;
-    /* VALUE_CHANGED drives the live label; RELEASED drives the single post. */
-    lv_obj_add_event_cb(arc, _arc_event_cb, LV_EVENT_VALUE_CHANGED, slot);
-    lv_obj_add_event_cb(arc, _arc_event_cb, LV_EVENT_RELEASED, slot);
+    /* Read-only: no touch callbacks; keep the slot populated so programmatic
+     * switch-protocol updates for index 4 are silently absorbed. */
+    slot->widget = card;
+    slot->update = _update_momentary;
 }
 
 static void _create_slider_card(lv_obj_t *tile, switch_slot_t *slot)
@@ -496,9 +541,8 @@ static void _create_ctrl_tile(ha_switch_screen_t *s, lv_obj_t *tile)
 {
     _create_header(tile, "HA Control");
 
-    _create_large_toggle(tile, &s->slots[3], 22, 96,
-                         &ui_img_ic_switch2_on_png, &ui_img_ic_switch2_off_png, 0, -10, true);
-    _create_arc_card(tile, &s->slots[4]);
+    _create_all_lights_card(tile, &s->slots[3], 22, 96);
+    _create_ha_temp_card(tile, &s->slots[4]);
     _create_row_toggle(tile, &s->slots[5], 22, 268,
                        &ui_img_ic_switch1_on_png, &ui_img_ic_switch1_off_png);
     _create_embedded_switch(tile, &s->slots[6], 244, 268, 60, 28);

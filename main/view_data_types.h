@@ -203,7 +203,8 @@ enum {
     /* P: ha/ha_mqtt.c  C: ha/ha_config.c  Payload: NULL */
     VIEW_EVENT_HA_ADDR_DISPLAY,
 
-    /* P: ha/ha_sensor.c  C: *** NO CONSUMER — not yet wired up ***
+    /* P: ha/ha_sensor.c (HA→device values on indicator/display/set)
+     * C: ha/ha_switch.c (updates the Bedroom/Loft temp card, LVGL lock held)
      * Payload: struct view_data_ha_sensor_data */
     VIEW_EVENT_HA_SENSOR,
 

@@ -12,9 +12,9 @@ int indicator_view_init(void) {
 	indicator_display_view_init();
 #endif
 
-#ifdef SENSOR_H
-	view_sensor_init();
-#endif
+	/* view_sensor_init() intentionally not called: the sensor data tile was
+	 * removed (base D1 hardware has no onboard sensors — see nav.h). The
+	 * sensor model keeps running harmlessly; nothing consumes its events. */
 
 #ifdef WIFI_H
 	indicator_wifi_view_init();

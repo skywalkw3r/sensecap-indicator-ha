@@ -257,7 +257,10 @@ void view_event_sensor_link_stale(void* handler_args, esp_event_base_t base, int
 
 void view_sensor_init() {
 	lv_port_sem_take();
-	lv_obj_t* tile = nav_get_tile(NAV_TILE_HA_DATA);
+	/* The sensor data tile was removed from nav (base D1 has no onboard
+	 * sensors) and this init is no longer called from indicator_view.c.
+	 * nav_get_tile(-1) yields NULL so an accidental call stays a no-op. */
+	lv_obj_t* tile = nav_get_tile(-1);
 	if(tile == NULL)
 	{
 		lv_port_sem_give();

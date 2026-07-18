@@ -84,56 +84,48 @@ void ha_sensor_init(void)
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_SENSOR_DATA, view_event_handler, NULL, NULL));
 }
 
+void ha_sensor_subscribe(esp_mqtt_client_handle_t client)
+{
+    /* HA→device display values only. Deliberately NOT the device's own
+     * publish topic (CONFIG_TOPIC_SENSOR_DATA) — subscribing to that echoed
+     * every publish back into this parser for nothing. */
+    int msg_id = esp_mqtt_client_subscribe(client, CONFIG_TOPIC_DISPLAY_SET, CONFIG_TOPIC_SENSOR_DATA_QOS);
+    ESP_LOGI(TAG, "subscribe:%s, msg_id=%d", CONFIG_TOPIC_DISPLAY_SET, msg_id);
+}
+
 int ha_sensor_on_mqtt_data(const char *topic, int topic_len, const char *data, int data_len)
 {
-    const char *expected_topic = ha_sensor_entities[0].topic;
-    if (topic_len != (int)strlen(expected_topic) || memcmp(topic, expected_topic, topic_len) != 0) {
+    if (topic_len != (int)strlen(CONFIG_TOPIC_DISPLAY_SET) ||
+        memcmp(topic, CONFIG_TOPIC_DISPLAY_SET, topic_len) != 0) {
         return -1;
     }
 
     cJSON *root = cJSON_ParseWithLength(data, data_len);
-    if (root == NULL || root->child == NULL || root->child->string == NULL) {
+    if (root == NULL) {
         ESP_LOGE(TAG, "Invalid JSON structure");
+        return -1;
+    }
+
+    /* Home Assistant templates publish numbers or strings depending on how the
+     * automation is written — accept both. */
+    cJSON *item = cJSON_GetObjectItem(root, CONFIG_HA_TEMP_VALUE_KEY);
+    if (item == NULL || (!cJSON_IsNumber(item) && !cJSON_IsString(item))) {
+        ESP_LOGW(TAG, "No usable '%s' key on %s", CONFIG_HA_TEMP_VALUE_KEY, CONFIG_TOPIC_DISPLAY_SET);
         cJSON_Delete(root);
         return -1;
     }
 
-    cJSON *c_key = root->child;
-    ESP_LOGI(TAG, "c_key = %s", c_key->string);
-    size_t key_len = strlen(c_key->string);
-
-    for (int i = 0; i < CONFIG_HA_SENSOR_ENTITY_NUM; i++) {
-        if (key_len == strlen(ha_sensor_entities[i].key) && memcmp(c_key->string, ha_sensor_entities[i].key, key_len) == 0) {
-            cJSON *cjson_item = cJSON_GetObjectItem(root, c_key->string);
-            if (cjson_item != NULL && cJSON_IsString(cjson_item)) {
-                struct view_data_ha_sensor_data sensor_data = {.index = i};
-                strncpy(sensor_data.value, cjson_item->valuestring, sizeof(sensor_data.value) - 1);
-
-                ESP_LOGI(TAG, "MQTT message: sensor %s is %s", ha_sensor_entities[i].key, sensor_data.value);
-                /*
-                 * NOTE: VIEW_EVENT_HA_SENSOR currently has NO consumer, so this
-                 * value is parsed and posted but never shown. Wiring it up turns
-                 * the Indicator into a generic HA dashboard: display ANY entity
-                 * pushed from Home Assistant over MQTT, with no physical sensor
-                 * attached to the device (the use case in issue #5).
-                 *
-                 * To wire it up:
-                 *   1. ha_switch_screen.c::_create_sensor_card already builds the
-                 *      "N/A" data labels on NAV_TILE_HA_MIX but discards the handle.
-                 *      Store each label keyed by card index (cf. the switch_slot_t
-                 *      pattern).
-                 *   2. Register a VIEW_EVENT_HA_SENSOR handler that, under the LVGL
-                 *      lock, does lv_label_set_text(labels[data->index], data->value).
-                 *   3. Make sensor_data.index here map to the intended card slot.
-                 */
-                esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, &sensor_data, sizeof(sensor_data), portMAX_DELAY);
-                cJSON_Delete(root);
-                return 0;
-            }
-        }
+    struct view_data_ha_sensor_data sensor_data = {.index = 0};
+    if (cJSON_IsNumber(item)) {
+        snprintf(sensor_data.value, sizeof(sensor_data.value), "%.1f", item->valuedouble);
+    } else {
+        strncpy(sensor_data.value, item->valuestring, sizeof(sensor_data.value) - 1);
     }
 
-    ESP_LOGW(TAG, "No matching sensor topic or invalid JSON structure");
+    ESP_LOGI(TAG, "HA display value %s = %s", CONFIG_HA_TEMP_VALUE_KEY, sensor_data.value);
+    /* Consumed by ha_switch.c's VIEW_EVENT_HA_SENSOR handler, which updates
+     * the Bedroom/Loft temperature card under the LVGL lock. */
+    esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, &sensor_data, sizeof(sensor_data), portMAX_DELAY);
     cJSON_Delete(root);
-    return -1;
+    return 0;
 }
