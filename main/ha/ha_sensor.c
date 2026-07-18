@@ -106,26 +106,44 @@ int ha_sensor_on_mqtt_data(const char *topic, int topic_len, const char *data, i
         return -1;
     }
 
-    /* Home Assistant templates publish numbers or strings depending on how the
-     * automation is written — accept both. */
-    cJSON *item = cJSON_GetObjectItem(root, CONFIG_HA_TEMP_VALUE_KEY);
-    if (item == NULL || (!cJSON_IsNumber(item) && !cJSON_IsString(item))) {
-        ESP_LOGW(TAG, "No usable '%s' key on %s", CONFIG_HA_TEMP_VALUE_KEY, CONFIG_TOPIC_DISPLAY_SET);
-        cJSON_Delete(root);
-        return -1;
+    /* Display keys, index-aligned with the view contract (0=temp 1=humidity
+     * 2=co2). Any subset may appear per message; each present key posts one
+     * event. HA templates publish numbers or strings — accept both. */
+    static const char *const display_keys[CONFIG_HA_DISPLAY_VALUE_NUM] = {
+        CONFIG_HA_TEMP_VALUE_KEY,
+        CONFIG_HA_HUMIDITY_VALUE_KEY,
+        CONFIG_HA_CO2_VALUE_KEY,
+    };
+
+    int posted = 0;
+    for (int i = 0; i < CONFIG_HA_DISPLAY_VALUE_NUM; i++) {
+        cJSON *item = cJSON_GetObjectItem(root, display_keys[i]);
+        if (item == NULL || (!cJSON_IsNumber(item) && !cJSON_IsString(item))) {
+            continue;
+        }
+
+        struct view_data_ha_sensor_data sensor_data = {.index = i};
+        if (cJSON_IsNumber(item)) {
+            /* Whole numbers render without a trailing .0 (humidity %, CO2 ppm). */
+            if (item->valuedouble == (double)(long)item->valuedouble) {
+                snprintf(sensor_data.value, sizeof(sensor_data.value), "%ld", (long)item->valuedouble);
+            } else {
+                snprintf(sensor_data.value, sizeof(sensor_data.value), "%.1f", item->valuedouble);
+            }
+        } else {
+            strncpy(sensor_data.value, item->valuestring, sizeof(sensor_data.value) - 1);
+        }
+
+        ESP_LOGI(TAG, "HA display value %s = %s", display_keys[i], sensor_data.value);
+        /* Consumed by ha_switch.c's VIEW_EVENT_HA_SENSOR handler, which updates
+         * the display cards under the LVGL lock. */
+        esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, &sensor_data, sizeof(sensor_data), portMAX_DELAY);
+        posted++;
     }
 
-    struct view_data_ha_sensor_data sensor_data = {.index = 0};
-    if (cJSON_IsNumber(item)) {
-        snprintf(sensor_data.value, sizeof(sensor_data.value), "%.1f", item->valuedouble);
-    } else {
-        strncpy(sensor_data.value, item->valuestring, sizeof(sensor_data.value) - 1);
+    if (posted == 0) {
+        ESP_LOGW(TAG, "No usable display keys on %s", CONFIG_TOPIC_DISPLAY_SET);
     }
-
-    ESP_LOGI(TAG, "HA display value %s = %s", CONFIG_HA_TEMP_VALUE_KEY, sensor_data.value);
-    /* Consumed by ha_switch.c's VIEW_EVENT_HA_SENSOR handler, which updates
-     * the Bedroom/Loft temperature card under the LVGL lock. */
-    esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, &sensor_data, sizeof(sensor_data), portMAX_DELAY);
     cJSON_Delete(root);
-    return 0;
+    return posted > 0 ? 0 : -1;
 }

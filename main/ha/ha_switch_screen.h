@@ -13,9 +13,10 @@ ha_switch_screen_t *ha_switch_screen_create(void);
 // Caller must hold lv_port semaphore.
 void ha_switch_screen_update(ha_switch_screen_t *s, int index, int value);
 
-// Set the HA-pushed Bedroom/Loft temperature display (read-only card).
-// Caller must hold lv_port semaphore. `value` is the numeric text, e.g. "72.4".
-void ha_switch_screen_set_ha_temp(const char *value);
+// Set an HA-pushed display value (read-only cards on the Loft Controls page).
+// index: 0=temperature 1=humidity 2=co2. Caller must hold lv_port semaphore.
+// `value` is the numeric text, e.g. "72.4".
+void ha_switch_screen_set_ha_value(int index, const char *value);
 
 void ha_switch_screen_destroy(ha_switch_screen_t *s);
 

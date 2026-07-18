@@ -26,12 +26,8 @@
 #define SWITCH_TRACK 0x4F4F4F
 #define ARC_TRACK 0x1C1C1C
 
-LV_IMAGE_DECLARE(ui_img_ic_temp_png);
-LV_IMAGE_DECLARE(ui_img_ic_hum_png);
 LV_IMAGE_DECLARE(ui_img_ic_switch1_on_png);
 LV_IMAGE_DECLARE(ui_img_ic_switch1_off_png);
-LV_IMAGE_DECLARE(ui_img_ic_switch2_on_png);
-LV_IMAGE_DECLARE(ui_img_ic_switch2_off_png);
 LV_FONT_DECLARE(ui_font_font0);
 LV_FONT_DECLARE(ui_font_font2);
 
@@ -54,18 +50,6 @@ struct ha_switch_screen {
     bool created;
 };
 
-typedef struct {
-    const lv_image_dsc_t *icon;
-    const char *name;
-    const char *unit;
-    uint32_t accent_color;
-    int32_t x;
-    int32_t y;
-    int32_t data_x;
-    int32_t data_y;
-    int32_t unit_y;
-} sensor_card_spec_t;
-
 static ha_switch_screen_t _instance;
 
 static const char *const switch_names[SWITCH_SLOT_COUNT] = {
@@ -77,31 +61,6 @@ static const char *const switch_names[SWITCH_SLOT_COUNT] = {
     CONFIG_SWITCH6_UI_NAME,
     CONFIG_SWITCH7_UI_NAME,
     CONFIG_SWITCH8_UI_NAME,
-};
-
-static const sensor_card_spec_t mix_sensor_cards[] = {
-    {
-        .icon = &ui_img_ic_temp_png,
-        .name = "Temp",
-        .unit = "°C",
-        .accent_color = 0xECBF41,
-        .x = 22,
-        .y = 96,
-        .data_x = 14,
-        .data_y = 83,
-        .unit_y = 85,
-    },
-    {
-        .icon = &ui_img_ic_hum_png,
-        .name = "Humidity",
-        .unit = "%",
-        .accent_color = 0x52AAE5,
-        .x = 244,
-        .y = 96,
-        .data_x = 13,
-        .data_y = 83,
-        .unit_y = 83,
-    },
 };
 
 static void _post_switch_value(int index, int value)
@@ -238,78 +197,11 @@ static void _create_header(lv_obj_t *tile, const char *title)
     lv_obj_set_style_border_width(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_t *label = _create_label(header, title, &ui_font_font0, 0xFFFFFF);
+    /* montserrat, not the custom font0: font0's subset doesn't cover these
+     * titles reliably (rendered blank in the simulator). */
+    lv_obj_t *label = _create_label(header, title, &lv_font_montserrat_24, 0xFFFFFF);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_center(label);
-}
-
-static void _create_sensor_card(lv_obj_t *tile, const sensor_card_spec_t *spec)
-{
-    lv_color_t accent = lv_color_hex(spec->accent_color);
-
-    lv_obj_t *card = lv_button_create(tile);
-    _style_panel(card, CARD_WIDTH, CARD_HEIGHT, spec->x, spec->y);
-    lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-
-    lv_obj_t *icon = lv_image_create(card);
-    lv_image_set_src(icon, spec->icon);
-    lv_obj_set_pos(icon, 69, 22);
-    lv_obj_add_flag(icon, LV_OBJ_FLAG_ADV_HITTEST);
-    lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
-
-    /*
-     * This "N/A" label is the display slot for HA-pushed sensor values
-     * (VIEW_EVENT_HA_SENSOR). Its handle is currently discarded, so the card
-     * stays "N/A". To make it live, store `data` keyed by card index and have a
-     * VIEW_EVENT_HA_SENSOR handler call lv_label_set_text on it. See the wiring
-     * note in ha_sensor.c (ha_sensor_on_mqtt_data).
-     */
-    lv_obj_t *data = lv_label_create(card);
-    lv_obj_set_size(data, 100, LV_SIZE_CONTENT);
-    lv_obj_set_pos(data, spec->data_x, spec->data_y);
-    lv_label_set_text(data, "N/A");
-    lv_obj_set_style_text_color(data, accent, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(data, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_align(data, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(data, &ui_font_font2, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_t *unit = _create_label(card, spec->unit, &lv_font_montserrat_24, spec->accent_color);
-    lv_obj_set_pos(unit, 125, spec->unit_y);
-
-    lv_obj_t *name = _create_label(card, spec->name, &lv_font_montserrat_18, TEXT_MUTED);
-    lv_obj_set_align(name, LV_ALIGN_BOTTOM_MID);
-    lv_obj_set_y(name, -5);
-}
-
-static lv_obj_t *_create_large_toggle(lv_obj_t *tile, switch_slot_t *slot, int32_t x, int32_t y,
-                                      const lv_image_dsc_t *icon_on, const lv_image_dsc_t *icon_off,
-                                      int32_t icon_x, int32_t icon_y, bool center_icon)
-{
-    lv_obj_t *btn = lv_button_create(tile);
-    _style_checkable_card(btn, CARD_WIDTH, CARD_HEIGHT, x, y);
-
-    lv_obj_t *icon = lv_image_create(btn);
-    lv_image_set_src(icon, icon_off);
-    if (center_icon) {
-        lv_obj_set_align(icon, LV_ALIGN_CENTER);
-        lv_obj_set_y(icon, icon_y);
-    } else {
-        lv_obj_set_pos(icon, icon_x, icon_y);
-    }
-    lv_obj_add_flag(icon, LV_OBJ_FLAG_ADV_HITTEST);
-    lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *label = _create_label(btn, switch_names[slot->index], &lv_font_montserrat_18, TEXT_MUTED);
-    lv_obj_set_align(label, LV_ALIGN_BOTTOM_MID);
-    lv_obj_set_y(label, -5);
-
-    slot->widget = btn;
-    slot->icon = icon;
-    slot->icon_on = icon_on;
-    slot->icon_off = icon_off;
-    slot->update = _update_toggle;
-    lv_obj_add_event_cb(btn, _switch_toggle_event_cb, LV_EVENT_VALUE_CHANGED, slot);
-    return btn;
 }
 
 static lv_obj_t *_create_row_toggle(lv_obj_t *tile, switch_slot_t *slot, int32_t x, int32_t y,
@@ -445,34 +337,51 @@ static void _create_all_lights_card(lv_obj_t *tile, switch_slot_t *slot, int32_t
     lv_obj_add_event_cb(btn, _all_lights_click_cb, LV_EVENT_CLICKED, slot);
 }
 
-/* ── Bedroom/Loft temperature (slot 4 / switch5): read-only display ─────
+/* ── HA-pushed display values: Loft climate + CO2 (read-only) ───────────
  * Fed by Home Assistant over CONFIG_TOPIC_DISPLAY_SET → VIEW_EVENT_HA_SENSOR
- * (see ha_sensor.c); never posts to the switch protocol. */
+ * (see ha_sensor.c); never posts to the switch protocol.
+ * Index contract: 0=temp 1=humidity 2=co2. */
 
-static lv_obj_t *s_ha_temp_value;
+#define HUMIDITY_ACCENT 0x52AAE5
 
-void ha_switch_screen_set_ha_temp(const char *value)
+static lv_obj_t *s_ha_display_value[CONFIG_HA_DISPLAY_VALUE_NUM];
+
+void ha_switch_screen_set_ha_value(int index, const char *value)
 {
     /* Caller holds the LVGL lock (ha_switch.c event handler). */
-    if (s_ha_temp_value != NULL && value != NULL) {
-        lv_label_set_text(s_ha_temp_value, value);
+    if (index < 0 || index >= CONFIG_HA_DISPLAY_VALUE_NUM || value == NULL) {
+        return;
+    }
+    if (s_ha_display_value[index] != NULL) {
+        if (index == 1) {
+            /* Humidity renders inline with its unit. */
+            char buf[40];
+            lv_snprintf(buf, sizeof(buf), "%s %%", value);
+            lv_label_set_text(s_ha_display_value[index], buf);
+        } else {
+            lv_label_set_text(s_ha_display_value[index], value);
+        }
     }
 }
 
-static void _create_ha_temp_card(lv_obj_t *tile, switch_slot_t *slot)
+static void _create_loft_climate_card(lv_obj_t *tile, switch_slot_t *slot)
 {
     lv_obj_t *card = lv_obj_create(tile);
-    _style_panel(card, CARD_WIDTH, CARD_HEIGHT, 244, 96);
+    _style_panel(card, CARD_WIDTH, CARD_HEIGHT, 22, 96);
 
     /* montserrat_48, not the custom font2: font2 is a numerals-only subset
      * and silently renders nothing for the "--" placeholder. */
-    s_ha_temp_value = _create_label(card, "--", &lv_font_montserrat_48, 0xECBF41);
-    lv_obj_set_align(s_ha_temp_value, LV_ALIGN_CENTER);
-    lv_obj_set_pos(s_ha_temp_value, -14, -20);
+    s_ha_display_value[0] = _create_label(card, "--", &lv_font_montserrat_48, 0xECBF41);
+    lv_obj_set_align(s_ha_display_value[0], LV_ALIGN_TOP_MID);
+    lv_obj_set_pos(s_ha_display_value[0], -16, 12);
 
     lv_obj_t *unit = _create_label(card, CONFIG_HA_TEMP_UI_UNIT, &lv_font_montserrat_24, 0xECBF41);
-    lv_obj_set_align(unit, LV_ALIGN_CENTER);
-    lv_obj_set_pos(unit, 78, -30);
+    lv_obj_set_align(unit, LV_ALIGN_TOP_MID);
+    lv_obj_set_pos(unit, 76, 16);
+
+    s_ha_display_value[1] = _create_label(card, "-- %", &lv_font_montserrat_24, HUMIDITY_ACCENT);
+    lv_obj_set_align(s_ha_display_value[1], LV_ALIGN_TOP_MID);
+    lv_obj_set_y(s_ha_display_value[1], 82);
 
     lv_obj_t *name = _create_label(card, CONFIG_HA_TEMP_UI_NAME, &lv_font_montserrat_18, TEXT_MUTED);
     lv_obj_set_align(name, LV_ALIGN_BOTTOM_MID);
@@ -482,6 +391,24 @@ static void _create_ha_temp_card(lv_obj_t *tile, switch_slot_t *slot)
      * switch-protocol updates for index 4 are silently absorbed. */
     slot->widget = card;
     slot->update = _update_momentary;
+}
+
+static void _create_co2_card(lv_obj_t *tile)
+{
+    lv_obj_t *card = lv_obj_create(tile);
+    _style_panel(card, CARD_WIDTH, CARD_HEIGHT, 244, 96);
+
+    s_ha_display_value[2] = _create_label(card, "--", &lv_font_montserrat_48, 0xFFFFFF);
+    lv_obj_set_align(s_ha_display_value[2], LV_ALIGN_TOP_MID);
+    lv_obj_set_pos(s_ha_display_value[2], -14, 12);
+
+    lv_obj_t *unit = _create_label(card, CONFIG_HA_CO2_UI_UNIT, &lv_font_montserrat_18, TEXT_MUTED);
+    lv_obj_set_align(unit, LV_ALIGN_TOP_MID);
+    lv_obj_set_pos(unit, 74, 32);
+
+    lv_obj_t *name = _create_label(card, CONFIG_HA_CO2_UI_NAME, &lv_font_montserrat_18, TEXT_MUTED);
+    lv_obj_set_align(name, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_y(name, -5);
 }
 
 static void _create_slider_card(lv_obj_t *tile, switch_slot_t *slot)
@@ -523,29 +450,25 @@ static void _init_slots(ha_switch_screen_t *s)
     }
 }
 
-static void _create_mix_tile(ha_switch_screen_t *s, lv_obj_t *tile)
+static void _create_general_tile(ha_switch_screen_t *s, lv_obj_t *tile)
 {
-    _create_header(tile, "Home Assistant");
-    for (size_t i = 0; i < sizeof(mix_sensor_cards) / sizeof(mix_sensor_cards[0]); i++) {
-        _create_sensor_card(tile, &mix_sensor_cards[i]);
-    }
+    _create_header(tile, "General Controls");
 
-    _create_large_toggle(tile, &s->slots[0], 22, 268,
-                         &ui_img_ic_switch2_on_png, &ui_img_ic_switch2_off_png, 39, 10, false);
-    _create_row_toggle(tile, &s->slots[1], 244, 268,
+    _create_all_lights_card(tile, &s->slots[3], 22, 96);
+    /* Vertically centered beside the taller All Lights card. */
+    _create_row_toggle(tile, &s->slots[5], 244, 139,
                        &ui_img_ic_switch1_on_png, &ui_img_ic_switch1_off_png);
-    _create_embedded_switch(tile, &s->slots[2], 243, 351, 80, 30);
+    /* switch1-3 spares and the old placeholder sensor cards were dropped;
+     * this page grows as real devices get mapped. */
 }
 
 static void _create_ctrl_tile(ha_switch_screen_t *s, lv_obj_t *tile)
 {
-    _create_header(tile, "HA Control");
+    _create_header(tile, "Loft Controls");
 
-    _create_all_lights_card(tile, &s->slots[3], 22, 96);
-    _create_ha_temp_card(tile, &s->slots[4]);
-    _create_row_toggle(tile, &s->slots[5], 22, 268,
-                       &ui_img_ic_switch1_on_png, &ui_img_ic_switch1_off_png);
-    _create_embedded_switch(tile, &s->slots[6], 244, 268, 60, 28);
+    _create_loft_climate_card(tile, &s->slots[4]);
+    _create_co2_card(tile);
+    _create_embedded_switch(tile, &s->slots[6], 22, 268, 60, 28);
     _create_slider_card(tile, &s->slots[7]);
 }
 
@@ -569,7 +492,7 @@ ha_switch_screen_t *ha_switch_screen_create(void)
     }
 
     _create_ctrl_tile(s, ctrl_tile);
-    _create_mix_tile(s, mix_tile);
+    _create_general_tile(s, mix_tile);
     s->created = true;
     lv_port_sem_give();
 

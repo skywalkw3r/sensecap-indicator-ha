@@ -48,6 +48,13 @@ int main(void) {
         settings_view_show();
     }
 
+    /* SIM_START_TILE=<n>: jump to nav tile n before the screenshot warm-up,
+     * so headless captures can preview any page. */
+    const char *start_tile = getenv("SIM_START_TILE");
+    if (start_tile && *start_tile) {
+        nav_go_tile(atoi(start_tile));
+    }
+
     /* 3. Start mock data injection (Step 5) */
     mock_sensors_start();
 

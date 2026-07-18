@@ -41,11 +41,18 @@ extern "C" {
 
 /* HA -> device display values (this is NOT the device's own sensor publish
  * topic, so there is no publish/subscribe echo loop). Home Assistant pushes
- * e.g. {"loft_temp": 72.4} here and the panel renders it read-only. */
+ * e.g. {"loft_temp": 72.4, "loft_humidity": 45, "loft_co2": 620} here — any
+ * subset per message — and the panel renders them read-only.
+ * Display indices (view_data_ha_sensor_data.index): 0=temp 1=humidity 2=co2. */
 #define CONFIG_TOPIC_DISPLAY_SET                 "indicator/display/set"
+#define CONFIG_HA_DISPLAY_VALUE_NUM              3
 #define CONFIG_HA_TEMP_VALUE_KEY                 "loft_temp"
+#define CONFIG_HA_HUMIDITY_VALUE_KEY             "loft_humidity"
+#define CONFIG_HA_CO2_VALUE_KEY                  "loft_co2"
 #define CONFIG_HA_TEMP_UI_NAME                   "Loft"
 #define CONFIG_HA_TEMP_UI_UNIT                   "°F"
+#define CONFIG_HA_CO2_UI_NAME                    "CO2"
+#define CONFIG_HA_CO2_UI_UNIT                    "ppm"
 
 // buildin sensor
 #define CONFIG_SENSOR_BUILDIN_CO2_VALUE_KEY      "co2"

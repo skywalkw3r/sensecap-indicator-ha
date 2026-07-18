@@ -148,7 +148,7 @@ static void view_event_handler(void *handler_args, esp_event_base_t base, int32_
              * Currently one consumer: the Bedroom/Loft temperature card. */
             struct view_data_ha_sensor_data *sensor = (struct view_data_ha_sensor_data *)event_data;
             lv_port_sem_take();
-            ha_switch_screen_set_ha_temp(sensor->value);
+            ha_switch_screen_set_ha_value(sensor->index, sensor->value);
             lv_port_sem_give();
             break;
         }
