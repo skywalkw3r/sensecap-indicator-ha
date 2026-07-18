@@ -21,6 +21,10 @@ enum start_screen {
 
 #define WIFI_SCAN_LIST_SIZE 15
 
+/* SSIDs are up to 32 bytes; ssid[33] keeps room for the NUL terminator so a
+ * full-length 32-char SSID from a wifi_ap_record_t / wifi_event_sta_connected_t
+ * copies in without a one-byte overflow. These structs are event payloads
+ * (VIEW_EVENT_WIFI_ST, VIEW_EVENT_WIFI_LIST); producers/consumers use sizeof(). */
 struct view_data_wifi_st {
     bool    is_connected;   /* station associated to the AP (drives the status icon) */
     bool    is_connecting;  /* association in progress */
@@ -28,7 +32,7 @@ struct view_data_wifi_st {
                              * this is the MQTT start gate — NOT internet
                              * reachability. The diagnostic gateway ping never
                              * writes this field. */
-    char    ssid[32];
+    char    ssid[33];
     int8_t  rssi;
 };
 
@@ -39,7 +43,7 @@ struct view_data_wifi_config {
 };
 
 struct view_data_wifi_item {
-    char    ssid[32];
+    char    ssid[33];
     bool    auth_mode;
     int8_t  rssi;
 };
