@@ -131,7 +131,7 @@ Three fixed topics carry all communication:
 
 1. **Install an MQTT broker** (Mosquitto is the simplest) and enable the MQTT integration in Home Assistant.
 
-2. **Point the Indicator at the broker** — from the device's MQTT screen, or via [`setmqtt`](#console-commands) over serial.
+2. **Point the Indicator at the broker** — from the device's MQTT screen, or via [`setmqtt`](#console-commands) over serial. The device ships with **no default broker**; until you set one it stays idle (it never connects to a public internet broker on its own). Once Wi-Fi has an IP address and a broker is configured, the client connects within seconds — internet access is not required, so isolated IoT VLANs work fine.
 
 3. **Add MQTT entities.** Append [`examples/homeassistant/mqtt-entities.yaml`](examples/homeassistant/mqtt-entities.yaml) to your `configuration.yaml` under the `mqtt:` key, then reload MQTT.
 
@@ -215,6 +215,8 @@ Run `idf.py menuconfig` to explore options. Notable locations:
 - **PSRAM clock** — `Components → ESP PSRAM → SPI RAM config` (requires "Make experimental features visible")
 
 To regenerate `sdkconfig` from defaults: delete it and run `./dev build`.
+
+**MQTT broker** — there is no compiled-in default broker; a fresh device is unconfigured and stays idle until you set a broker from the touchscreen or `setmqtt`. Config is stored in NVS. If a stored config is ever unreadable or the wrong size (e.g. after a struct change), the device treats itself as unconfigured rather than falling back to any default. The client (re)starts automatically whenever Wi-Fi obtains an IP and a broker is configured, and when you save a new broker; it does not require internet reachability.
 
 ---
 

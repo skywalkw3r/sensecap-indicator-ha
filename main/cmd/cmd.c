@@ -57,7 +57,11 @@ static bool normalize_broker_url(const char *input, char *output, size_t output_
 }
 
 static int read_ha_config(int argc, char **argv) {
-    ha_cfg_get(&ha_cfg);
+    esp_err_t err = ha_cfg_get(&ha_cfg);
+    if (err != ESP_OK || ha_cfg.broker_url[0] == '\0') {
+        ESP_LOGI(TAG, "MQTT not configured — set a broker with 'setmqtt' (see 'mqtthelp').");
+        return 0;
+    }
     ESP_LOGI(TAG, "| Broker Address               | %-40s |", ha_cfg.broker_url);
     ESP_LOGI(TAG, "| Client ID                    | %-40s |", ha_cfg.client_id);
     ESP_LOGI(TAG, "| MQTT username                | %-40s |", ha_cfg.username);

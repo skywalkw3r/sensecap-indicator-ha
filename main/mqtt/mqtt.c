@@ -7,6 +7,11 @@ static const char *TAG = "INDICATOR_MQTT";
 ESP_EVENT_DEFINE_BASE(MQTT_APP_EVENT_BASE);
 esp_event_loop_handle_t mqtt_app_event_handle;
 
+/* Network usability gate for MQTT starts. Tracks view_data_wifi_st.is_network,
+ * which now means "station has an IP" (set on IP_EVENT_STA_GOT_IP), not
+ * "internet reachable". So WiFi connected + config present starts the client
+ * within seconds; on WiFi loss the flag clears but the existing client is left
+ * alone for esp-mqtt to reconnect on its own. */
 bool mqtt_net_flag = false;
 
 bool get_mqtt_net_flag(void) {
@@ -18,7 +23,7 @@ static void _wifi_event_handler(void *handler_args, esp_event_base_t base, int32
         case VIEW_EVENT_WIFI_ST: {
             struct view_data_wifi_st *p_st = (struct view_data_wifi_st *)event_data;
             mqtt_net_flag = p_st->is_network;
-            ESP_LOGI(TAG, "event: VIEW_EVENT_WIFI_ST is_network:%d\tmqtt_net_flag:%d",
+            ESP_LOGI(TAG, "event: VIEW_EVENT_WIFI_ST network_up:%d\tmqtt_net_flag:%d",
                      p_st->is_network, mqtt_net_flag);
             break;
         }
