@@ -44,7 +44,7 @@ extern "C" {
  * e.g. {"loft_temp": 72.4} here and the panel renders it read-only. */
 #define CONFIG_TOPIC_DISPLAY_SET                 "indicator/display/set"
 #define CONFIG_HA_TEMP_VALUE_KEY                 "loft_temp"
-#define CONFIG_HA_TEMP_UI_NAME                   "Bedroom / Loft"
+#define CONFIG_HA_TEMP_UI_NAME                   "Loft"
 #define CONFIG_HA_TEMP_UI_UNIT                   "°F"
 
 // buildin sensor
