@@ -223,9 +223,12 @@ static int mqtt_config_set(int argc, char **argv) {
         if (ha_mqtt_enabled_set(false) != ESP_OK) return 1;
         ESP_LOGI(TAG, "MQTT client disabled");
     }
-    if (mqtt_args.enable->count > 0 || mqtt_args.disable->count > 0) {
-        /* Rebuild the WS side too: applies a WS shutdown on --enable and
-         * refreshes the settings status modal in both directions. */
+    if (mqtt_args.enable->count > 0 || mqtt_args.disable->count > 0 ||
+        mqtt_args.insecure->count > 0 || mqtt_args.secure->count > 0) {
+        /* Rebuild the WS side too: applies a WS shutdown on --enable, refreshes
+         * the settings status modal, and — since the TLS trust settings are
+         * shared with wss:// — makes --insecure/--secure take effect on a
+         * running WebSocket client (its config is baked at client init). */
         esp_event_post_to(ha_cfg_event_handle, HA_WS_EVENT_BASE, HA_WS_CFG_CHANGED, NULL, 0, portMAX_DELAY);
     }
     if (mqtt_args.insecure->count > 0) {
@@ -367,6 +370,8 @@ static int mqtt_ca_set(int argc, char **argv) {
         }
         ESP_LOGI(TAG, "Stored CA cleared — mqtts:// now verifies against the public CA bundle.");
         esp_event_post_to(ha_cfg_event_handle, HA_CFG_EVENT_BASE, HA_CFG_SET, NULL, 0, portMAX_DELAY);
+        /* Shared trust: a running wss:// client must rebuild to drop the CA. */
+        esp_event_post_to(ha_cfg_event_handle, HA_WS_EVENT_BASE, HA_WS_CFG_CHANGED, NULL, 0, portMAX_DELAY);
         return 0;
     }
 
@@ -387,9 +392,11 @@ static int mqtt_ca_set(int argc, char **argv) {
         return 1;
     }
     free(pem);
-    ESP_LOGI(TAG, "CA stored (%d bytes). mqtts:// connections now verify against it.", len);
+    ESP_LOGI(TAG, "CA stored (%d bytes). mqtts:// and wss:// connections now verify against it.", len);
     ESP_LOGI(TAG, "Reconnecting MQTT client.");
     esp_event_post_to(ha_cfg_event_handle, HA_CFG_EVENT_BASE, HA_CFG_SET, NULL, 0, portMAX_DELAY);
+    /* Shared trust: a running wss:// client must rebuild to pick up the CA. */
+    esp_event_post_to(ha_cfg_event_handle, HA_WS_EVENT_BASE, HA_WS_CFG_CHANGED, NULL, 0, portMAX_DELAY);
     return 0;
 }
 
