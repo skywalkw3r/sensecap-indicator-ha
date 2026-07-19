@@ -89,6 +89,17 @@ static int _cmd_send(uint8_t cmd, void* p_data, uint8_t len) {
 	return -1;
 }
 
+int rp2040_beep_pulse(void) {
+	/* ms payload is ignored by current RP2040 firmware (fixed 50 ms chirp)
+	 * but sent anyway so a future firmware can honor it. */
+	uint32_t ms = 50;
+	return _cmd_send(PKT_TYPE_CMD_BEEP_ON, &ms, sizeof(ms));
+}
+
+int rp2040_beep_stop(void) {
+	return _cmd_send(PKT_TYPE_CMD_BEEP_OFF, NULL, 0);
+}
+
 static bool _verify_xor_checksum(const uint8_t* p_data, size_t len) {
 	if(len < 2)
 	{

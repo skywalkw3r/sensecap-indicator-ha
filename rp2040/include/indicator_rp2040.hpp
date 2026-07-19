@@ -110,7 +110,7 @@ void grove_adc_get(void);  // todo
 /************************ beep ****************************/
 void beep_init(void);
 void beep_off(void);
-void beep_on(void);  // Give it a beep
+void beep_on(uint32_t ms = 50);  // Give it a beep (PKT_TYPE_CMD_BEEP_ON ms payload)
 /************************ Format printer ****************************/
 void printUint16Hex(uint16_t value);
 void printSerialNumber(uint16_t serial0, uint16_t serial1, uint16_t serial2);

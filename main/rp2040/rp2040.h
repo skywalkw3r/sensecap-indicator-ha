@@ -87,6 +87,12 @@ enum pkt_type_data
 
 void esp32_rp2040_init(void);
 
+/* Buzzer (RP2040 GPIO19). One BEEP_ON packet = one fixed ~50 ms chirp; the
+ * RP2040 ignores the ms payload, so longer sounds are sequenced by the caller
+ * (see ha_siren.c). BEEP_OFF forces the buzzer pin low. */
+int rp2040_beep_pulse(void);
+int rp2040_beep_stop(void);
+
 /**
  * @brief Parse sensor data received from the RP2040.
  *

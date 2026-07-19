@@ -135,13 +135,24 @@ void sensor_value_send(PacketSerial& packetSerial, uint8_t id, float data)
 
 /************************ aht  temp & humidity ****************************/
 
+/* dvarrel/AHT20 getHumidity()/getTemperature() return plausible-looking
+ * numbers (0 %, -50 C) even with no chip on the bus, so presence must be
+ * gated on begin() or a sensor-less base D1 streams junk to the ESP32. */
+static bool has_aht20 = false;
+
 void sensor_aht_init(void)
 {
-    AHT.begin();
+    has_aht20 = AHT.begin();
+    if (!has_aht20) {
+        Serial.println("AHT20 not found");
+    }
 }
 
 bool sensor_aht_get(AHTData& data)
 {
+    if (!has_aht20) {
+        return false;
+    }
     data.humidity    = AHT.getHumidity();
     data.temperature = AHT.getTemperature();
     if (isnan(data.humidity) || isnan(data.temperature)) {

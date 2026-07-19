@@ -98,3 +98,17 @@ number:
     command_topic: "indicator/switch/set"
     command_template: '{"switch8": {{ value }} }'
     value_template: "{{ value_json.switch8 }}"
+
+siren:
+  - unique_id: indicator_siren
+    name: "Indicator Buzzer"
+    command_topic: "indicator/siren/set"
+    state_topic: "indicator/siren/state"
+    state_value_template: "{{ value_json.state }}"
+    available_tones: [beep, doorbell, alarm]
+    support_duration: true
+    support_volume_set: false
+    qos: 1
+    command_template: >-
+      {"state": "{{ value }}"{% if tone is defined %}, "tone": "{{ tone }}"{% endif %}{% if duration is defined %}, "duration": {{ duration }}{% endif %}}
+    command_off_template: '{"state": "OFF"}'

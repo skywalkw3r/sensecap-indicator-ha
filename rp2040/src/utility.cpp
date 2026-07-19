@@ -3,19 +3,29 @@
 /************************ beep ****************************/
 const int Buzzer = 19;
 
+#define BEEP_FREQ_HZ    2700  /* near the passive buzzer's resonant frequency */
+#define BEEP_MAX_MS     5000
+
 void beep_init(void)
 {
     pinMode(Buzzer, OUTPUT);
+    digitalWrite(Buzzer, LOW);
 }
 void beep_off(void)
 {
-    digitalWrite(19, LOW);
+    noTone(Buzzer);
+    digitalWrite(Buzzer, LOW);
 }
-void beep_on(void)
+/* Non-blocking (tone() runs off a timer): the packet handler stays responsive,
+ * so a BEEP_OFF can cut a beep short and rapid beep sequences keep cadence. */
+void beep_on(uint32_t ms)
 {
-    analogWrite(Buzzer, 127);
-    delay(50);
-    analogWrite(Buzzer, 0);
+    if (ms == 0) {
+        ms = 50;
+    } else if (ms > BEEP_MAX_MS) {
+        ms = BEEP_MAX_MS;
+    }
+    tone(Buzzer, BEEP_FREQ_HZ, ms);
 }
 
 /************************ Format printer ****************************/

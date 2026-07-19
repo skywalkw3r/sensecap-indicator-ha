@@ -54,9 +54,14 @@ void onPacketReceived(const uint8_t* buffer, size_t size)
             sensor_sgp40_init();
             sensor_scd4x_init();
             break;
-        case PKT_TYPE_CMD_BEEP_ON:
-            beep_on();
+        case PKT_TYPE_CMD_BEEP_ON: {
+            uint32_t ms = 50;
+            if (size >= 5) {
+                memcpy(&ms, &buffer[1], sizeof(ms)); /* both cores little-endian */
+            }
+            beep_on(ms);
             break;
+        }
         case PKT_TYPE_CMD_BEEP_OFF:
             beep_off();
             break;
