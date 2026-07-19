@@ -188,7 +188,10 @@ static lv_obj_t *ui_header_bar(lv_obj_t *parent)
     lv_obj_t *header = lv_obj_create(parent);
     lv_obj_set_size(header, lv_pct(100), UI_HEADER_HEIGHT);
     lv_obj_set_align(header, LV_ALIGN_TOP_MID);
-    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+    /* Click-transparent: the bar spans the full width over corner chrome
+     * (nav's home shortcut) created before it; children (back buttons)
+     * remain clickable in their own right. */
+    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(header, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_opa(header, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);

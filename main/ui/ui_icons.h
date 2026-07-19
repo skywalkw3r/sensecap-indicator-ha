@@ -19,7 +19,12 @@ LV_FONT_DECLARE(ui_font_mdi_48);
 #define UI_ICON_HOME             "\xF3\xB0\x8B\x9C" /* U+F02DC mdi:home */
 #define UI_ICON_HOME_ROOF        "\xF3\xB1\x84\xAB" /* U+F112B mdi:home-roof [48] */
 #define UI_ICON_BED              "\xF3\xB0\x8B\xA3" /* U+F02E3 mdi:bed [48] */
+#define UI_ICON_CHAIR            "\xF3\xB0\xBD\x88" /* U+F0F48 mdi:chair-rolling [48] */
 #define UI_ICON_SOFA             "\xF3\xB0\x92\xB9" /* U+F04B9 mdi:sofa [48] */
+#define UI_ICON_FLOOR_LAMP       "\xF3\xB0\xA3\x9D" /* U+F08DD mdi:floor-lamp */
+#define UI_ICON_DESK_LAMP        "\xF3\xB0\xA5\x9F" /* U+F095F mdi:desk-lamp */
+#define UI_ICON_CEILING_LIGHT    "\xF3\xB0\x9D\xA9" /* U+F0769 mdi:ceiling-light */
+#define UI_ICON_WALL_SCONCE      "\xF3\xB0\xA4\x9C" /* U+F091C mdi:wall-sconce */
 #define UI_ICON_IMAGE            "\xF3\xB0\x8B\xA9" /* U+F02E9 mdi:image [48] */
 #define UI_ICON_SERVER           "\xF3\xB0\x92\x8B" /* U+F048B mdi:server [48] */
 #define UI_ICON_STRING_LIGHTS    "\xF3\xB1\x8A\xBA" /* U+F12BA mdi:string-lights [48] */

@@ -73,6 +73,11 @@ bool dash_slot_subscribable(int slot);
 /* The DASH_F_ROOM_TEMP sensor shown on `room`'s Home card; -1 if none. */
 int dash_room_temp_slot(int room);
 
+/* Fire an ACTION slot with the domain-appropriate service: automations are
+ * *triggered* (turn_on would merely re-enable them); scripts/scenes run via
+ * turn_on. Safe from any task (queues through ha_ws_call). */
+void dash_action_call(int slot);
+
 /* Register the MQTT-mode bridge (see ha_dash.c). Called from
  * indicator_ha_model_init() after the view event loop exists. */
 void ha_dash_init(void);

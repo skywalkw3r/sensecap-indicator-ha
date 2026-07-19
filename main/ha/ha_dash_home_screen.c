@@ -84,7 +84,7 @@ static void _toggle_chip_cb(lv_event_t *e)
 static void _action_confirmed(void *user_data)
 {
     int slot = (int)(intptr_t)user_data;
-    ha_ws_call("script", "turn_on", dash_slots[slot].entity_id, NULL);
+    dash_action_call(slot);
     ESP_LOGI(TAG, "action: %s", dash_slots[slot].entity_id);
 }
 
@@ -96,7 +96,7 @@ static void _action_chip_cb(lv_event_t *e)
     int slot = (int)(intptr_t)lv_event_get_user_data(e);
 
     if (!(dash_slots[slot].flags & DASH_F_CONFIRM)) {
-        ha_ws_call("script", "turn_on", dash_slots[slot].entity_id, NULL);
+        dash_action_call(slot);
         return;
     }
     char text[64];

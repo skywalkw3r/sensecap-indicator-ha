@@ -29,6 +29,9 @@
 #define ACTION_W     141
 #define ACTION_H     96
 #define ACTION_GAP   12
+#define ENV_W        141  /* DASH_F_COMPACT sensors: 3-up cells in one row */
+#define ENV_H        104
+#define ENV_GAP      12
 
 #define TOGGLE_TRACK_HEX 0x4F4F4F
 
@@ -79,8 +82,7 @@ static void _play_cb(lv_event_t *e)
 
 static void _action_confirmed(void *user_data)
 {
-    int slot = (int)(intptr_t)user_data;
-    ha_ws_call("script", "turn_on", dash_slots[slot].entity_id, NULL);
+    dash_action_call((int)(intptr_t)user_data);
 }
 
 static void _preset_cb(lv_event_t *e)
@@ -96,19 +98,65 @@ static void _preset_cb(lv_event_t *e)
                           _action_confirmed, (void *)(intptr_t)slot);
         return;
     }
-    ha_ws_call("script", "turn_on", dash_slots[slot].entity_id, NULL);
+    dash_action_call(slot);
 }
 
 /* ── Card builders (LVGL lock held by init) ──────────────────────────────── */
 
-static lv_obj_t *_card(lv_obj_t *tile, int y, int h)
+/* Vertically scrollable content column under the fixed page header. Pages
+ * whose cards fit simply never scroll; overflowing pages (Loft) pan. A
+ * horizontal drag can't scroll this column, so it chains to the tileview —
+ * page swiping keeps working. Elastic overscroll + momentum stay off to
+ * match the tileview's tuned, non-bouncy feel. */
+static lv_obj_t *_content_column(lv_obj_t *tile)
 {
-    lv_obj_t *card = lv_obj_create(tile);
-    lv_obj_set_size(card, CONTENT_W, h);
-    lv_obj_set_pos(card, PAD, y);
+    lv_obj_t *column = lv_obj_create(tile);
+    lv_obj_set_size(column, 480, 480 - CONTENT_Y);
+    lv_obj_set_pos(column, 0, CONTENT_Y);
+    lv_obj_set_style_bg_opa(column, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(column, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_hor(column, PAD, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_top(column, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_bottom(column, UI_SPACE_LG, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_scroll_dir(column, LV_DIR_VER);
+    lv_obj_remove_flag(column, LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM);
+    return column;
+}
+
+static lv_obj_t *_card_at(lv_obj_t *parent, int x, int y, int w, int h)
+{
+    lv_obj_t *card = lv_obj_create(parent);
+    lv_obj_set_size(card, w, h);
+    lv_obj_set_pos(card, x, y);
     ui_apply_card(card);
     lv_obj_set_style_pad_all(card, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     return card;
+}
+
+static lv_obj_t *_card(lv_obj_t *parent, int y, int h)
+{
+    return _card_at(parent, 0, y, CONTENT_W, h);
+}
+
+/* Compact environment cell (DASH_F_COMPACT): glyph over value over label,
+ * three to a row — the dense form of the full-width stat row. */
+static void _build_env_cell(lv_obj_t *parent, int slot, int x, int y)
+{
+    const dash_slot_t *def    = &dash_slots[slot];
+    lv_color_t         accent = lv_color_hex(def->accent);
+    lv_obj_t          *card   = _card_at(parent, x, y, ENV_W, ENV_H);
+
+    lv_obj_t *icon = ui_label(card, def->icon, &ui_font_mdi_32, accent);
+    lv_obj_set_align(icon, LV_ALIGN_TOP_MID);
+    lv_obj_set_y(icon, 8);
+
+    s_w[slot].value = ui_label(card, "--", &lv_font_montserrat_24, accent);
+    lv_obj_set_align(s_w[slot].value, LV_ALIGN_TOP_MID);
+    lv_obj_set_y(s_w[slot].value, 46);
+
+    lv_obj_t *label = ui_label(card, def->label, LV_FONT_DEFAULT, UI_COLOR_TEXT_MUTED);
+    lv_obj_set_align(label, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_y(label, -8);
 }
 
 /* Hero temperature: big value + accent badge, the room's headline number. */
@@ -350,11 +398,14 @@ static void _build_room_page(int room)
 {
     lv_obj_t *tile = nav_get_tile(NAV_TILE_ROOM_FIRST + room);
     ui_header(tile, dash_rooms[room].name);
+    lv_obj_t *column = _content_column(tile);
 
     uint8_t page      = (uint8_t)(DASH_PAGE_HOME + 1 + room);
-    int     y         = CONTENT_Y;
-    int     action_x  = PAD;
+    int     y         = 0;
+    int     action_x  = 0;
     int     action_y  = -1; /* first ACTION slot opens the chip row */
+    int     env_x     = 0;
+    int     env_y     = -1; /* first DASH_F_COMPACT sensor opens the env row */
 
     for (int i = 0; i < DASH_SLOT_COUNT; i++) {
         const dash_slot_t *def = &dash_slots[i];
@@ -363,24 +414,31 @@ static void _build_room_page(int room)
         }
         switch ((dash_kind_t)def->kind) {
             case DASH_KIND_SENSOR:
-                if (def->flags & DASH_F_ROOM_TEMP) {
-                    _build_hero(tile, i, y);
+                if (def->flags & DASH_F_COMPACT) {
+                    if (env_y < 0) {
+                        env_y = y;
+                        y += ENV_H + ROW_GAP;
+                    }
+                    _build_env_cell(column, i, env_x, env_y);
+                    env_x += ENV_W + ENV_GAP;
+                } else if (def->flags & DASH_F_ROOM_TEMP) {
+                    _build_hero(column, i, y);
                     y += HERO_H + ROW_GAP;
                 } else {
-                    _build_stat(tile, i, y);
+                    _build_stat(column, i, y);
                     y += STAT_H + ROW_GAP;
                 }
                 break;
             case DASH_KIND_TOGGLE:
-                _build_toggle(tile, i, y);
+                _build_toggle(column, i, y);
                 y += TOGGLE_H + ROW_GAP;
                 break;
             case DASH_KIND_LIGHT:
-                _build_light(tile, i, y);
+                _build_light(column, i, y);
                 y += LIGHT_H + ROW_GAP;
                 break;
             case DASH_KIND_MEDIA:
-                _build_media(tile, i, y);
+                _build_media(column, i, y);
                 y += MEDIA_H + ROW_GAP;
                 break;
             case DASH_KIND_ACTION:
@@ -388,7 +446,7 @@ static void _build_room_page(int room)
                     action_y = y;
                     y += ACTION_H + ROW_GAP;
                 }
-                _build_action_chip(tile, i, action_x, action_y);
+                _build_action_chip(column, i, action_x, action_y);
                 action_x += ACTION_W + ACTION_GAP;
                 break;
         }

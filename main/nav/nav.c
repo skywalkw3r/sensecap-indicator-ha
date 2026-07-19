@@ -2,6 +2,8 @@
 
 #include "lv_port.h"
 #include "sdkconfig.h"
+#include "ui_components.h"
+#include "ui_icons.h"
 #include "ui_theme.h"
 
 #define NAV_TILE_WIDTH  CONFIG_LCD_EVB_SCREEN_WIDTH
@@ -35,6 +37,35 @@ static void nav_scroll_begin_cb(lv_event_t *e) {
 	}
 }
 
+static void nav_home_btn_cb(lv_event_t *e) {
+	if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+		nav_go_tile(NAV_TILE_HOME);
+	}
+}
+
+/* Home shortcut on every non-home tile, sitting where the home tile keeps its
+ * WiFi status icon (top-right) so the corner always carries chrome. Page
+ * headers are created later but are click-transparent (ui_header_bar), so
+ * this button keeps receiving taps underneath them. Mirrors the WiFi/back
+ * button styling: transparent at rest, filled while pressed. */
+static void nav_add_home_button(lv_obj_t *tile) {
+	lv_obj_t *button = lv_button_create(tile);
+	lv_obj_set_size(button, 60, 60);
+	lv_obj_set_align(button, LV_ALIGN_TOP_RIGHT);
+	lv_obj_set_pos(button, -10, 10);
+	lv_obj_set_style_bg_opa(button, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_bg_color(button, UI_COLOR_SURFACE_PRESSED, LV_PART_MAIN | LV_STATE_PRESSED);
+	lv_obj_set_style_bg_opa(button, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_PRESSED);
+	lv_obj_set_style_border_width(button, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_radius(button, UI_RADIUS_BUTTON, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_shadow_width(button, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_set_style_pad_all(button, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+	lv_obj_add_event_cb(button, nav_home_btn_cb, LV_EVENT_CLICKED, NULL);
+
+	lv_obj_t *icon = ui_label(button, UI_ICON_HOME, &ui_font_mdi_32, UI_COLOR_TEXT);
+	lv_obj_center(icon);
+}
+
 int nav_init(void) {
 	lv_port_sem_take();
 
@@ -59,6 +90,9 @@ int nav_init(void) {
 										  LV_DIR_LEFT | LV_DIR_RIGHT);
 		lv_obj_set_size(s_tiles[i], NAV_TILE_WIDTH, NAV_TILE_HEIGHT);
 		nav_style_static_obj(s_tiles[i]);
+		if (i != NAV_TILE_HOME) {
+			nav_add_home_button(s_tiles[i]);
+		}
 	}
 
 	lv_port_sem_give();

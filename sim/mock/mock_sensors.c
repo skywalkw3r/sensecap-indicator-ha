@@ -126,7 +126,7 @@ static void tick_dash_sensors(float t) {
     snprintf(buf, sizeof(buf), "%.1f", osc(t, 66.0f, 82.0f, 90.0f));
     post_dash_sensor(SLOT_LOFT_TEMP, buf);
     snprintf(buf, sizeof(buf), "%.1f", osc(t, 73.5f, 78.5f, 110.0f));
-    post_dash_sensor(SLOT_GUEST_TEMP, buf);
+    post_dash_sensor(SLOT_OFFICE_TEMP, buf);
     snprintf(buf, sizeof(buf), "%.1f", osc(t, 78.0f, 86.0f, 80.0f));
     post_dash_sensor(SLOT_LIVING_TEMP, buf);
     snprintf(buf, sizeof(buf), "%.1f", osc(t, 73.0f, 79.0f, 95.0f));

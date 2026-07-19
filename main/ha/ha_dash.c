@@ -67,6 +67,26 @@ int dash_room_temp_slot(int room)
     return -1;
 }
 
+void dash_action_call(int slot)
+{
+    if (slot < 0 || slot >= DASH_SLOT_COUNT || dash_slots[slot].kind != DASH_KIND_ACTION) {
+        return;
+    }
+    const char *id  = dash_slots[slot].entity_id;
+    const char *dot = strchr(id, '.');
+
+    char   domain[24] = "script";
+    size_t dlen       = (dot != NULL) ? (size_t)(dot - id) : 0;
+    if (dlen > 0 && dlen < sizeof(domain)) {
+        memcpy(domain, id, dlen);
+        domain[dlen] = '\0';
+    }
+    /* automation.trigger runs the automation's actions now; turn_on would only
+     * (re-)enable it. Everything else (script, scene, ...) runs via turn_on. */
+    const char *service = (strcmp(domain, "automation") == 0) ? "trigger" : "turn_on";
+    ha_ws_call(domain, service, id, NULL);
+}
+
 /* ── MQTT-mode legacy bridge ──────────────────────────────────────────────
  *
  * With the WebSocket client disabled, HA can still push the three Loft display
