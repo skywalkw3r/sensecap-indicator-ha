@@ -114,7 +114,9 @@ reference them):
 1. **New entity on an existing page** — add an `X(...)` row to `DASH_SLOT_LIST`
    with the page, kind (`SENSOR`/`TOGGLE`/`LIGHT`/`ACTION`/`MEDIA`), entity id,
    label, icon and accent. The subscription, routing and page layout pick it up
-   automatically.
+   automatically. A TOGGLE/LIGHT id may be a comma-separated group
+   (`"light.a,light.b"`, no spaces): one row drives every member, state follows
+   the most recently updated member.
 2. **New icon** — add it to `ICONS` in `scripts/gen_mdi_font.py`, regenerate
    (`python3 scripts/gen_mdi_font.py`), reference the new `UI_ICON_*` macro.
 3. **New room** — add an `X(...)` row to `DASH_ROOM_LIST` *and* a page id in

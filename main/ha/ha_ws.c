@@ -61,7 +61,8 @@ static bool   s_rx_drop = false;
  * two senders never share bytes; esp_websocket_client_send_text itself is
  * tx-locked, making concurrent sends safe. */
 static char s_tx_buf[HA_WS_TX_BUF_MAX];
-static char s_call_buf[320]; /* ha_event_task only: id + domain/service/entity/extra */
+static char s_call_buf[384]; /* ha_event_task only: id + domain/service/entity/extra
+                              * at their ha_ws_call_req_t maximums + JSON framing */
 
 /* Message-id counter is shared by both senders — allocate under the spinlock. */
 static int s_msg_id = 1;
@@ -264,8 +265,10 @@ static void _send_auth(void)
 }
 
 /* Subscribe to every subscribable dashboard slot (ACTION slots are commands,
- * not state). Duplicate entity ids across slots are sent once — the routing
- * side fans one update out to every matching slot. */
+ * not state). Group slots contribute each member individually — HA validates
+ * every id in the array, so a comma list must never be sent whole. Duplicate
+ * ids (across slots or group members) are sent once — the routing side fans
+ * one update out to every matching slot. */
 static void _send_subscribe(void)
 {
     int id = _next_msg_id();
@@ -276,20 +279,26 @@ static void _send_subscribe(void)
         if (!dash_slot_subscribable(i)) {
             continue;
         }
-        bool dup = false;
-        for (int j = 0; j < i; j++) {
-            if (dash_slot_subscribable(j) &&
-                strcmp(dash_slots[j].entity_id, dash_slots[i].entity_id) == 0) {
-                dup = true;
-                break;
+        char member[64];
+        for (const char *cur = dash_slots[i].entity_id;
+             cur != NULL && len < (int)sizeof(s_tx_buf);) {
+            cur = dash_entity_list_next(cur, member, sizeof(member));
+            if (member[0] == '\0') {
+                continue; /* stray comma — an empty id would void the subscribe */
             }
+            /* Dedupe against everything already framed: ids only appear in
+             * s_tx_buf quoted, and a valid id always contains a dot while the
+             * protocol keys around it never do — so a quoted-id search is an
+             * exact membership test. */
+            char quoted[66];
+            snprintf(quoted, sizeof(quoted), "\"%s\"", member);
+            if (strstr(s_tx_buf, quoted) != NULL) {
+                continue;
+            }
+            len += snprintf(s_tx_buf + len, sizeof(s_tx_buf) - len, "%s%s",
+                            first ? "" : ",", quoted);
+            first = false;
         }
-        if (dup) {
-            continue;
-        }
-        len += snprintf(s_tx_buf + len, sizeof(s_tx_buf) - len, "%s\"%s\"",
-                        first ? "" : ",", dash_slots[i].entity_id);
-        first = false;
     }
     if (len < (int)sizeof(s_tx_buf)) {
         len += snprintf(s_tx_buf + len, sizeof(s_tx_buf) - len, "]}");
@@ -375,7 +384,9 @@ static void _media_merge(int slot, const cJSON *state, const cJSON *attrs,
 
 /* Route one entity's snapshot entry ("a") or diff ("+"/"-") to every matching
  * dashboard slot (duplicate ids across slots are legal — subscribe dedupes,
- * routing fans out). */
+ * routing fans out). Group slots match any member; each member update repaints
+ * the whole row, so the row tracks the most recently changed member. Panel
+ * commands always target all members, which keeps them converged. */
 static void _apply_entity(const char *entity_id, const cJSON *plus, const cJSON *minus,
                           bool diff)
 {
@@ -384,7 +395,7 @@ static void _apply_entity(const char *entity_id, const cJSON *plus, const cJSON 
 
     for (int slot = 0; slot < DASH_SLOT_COUNT; slot++) {
         const dash_slot_t *def = &dash_slots[slot];
-        if (def->kind == DASH_KIND_ACTION || strcmp(def->entity_id, entity_id) != 0) {
+        if (def->kind == DASH_KIND_ACTION || !dash_entity_list_has(def->entity_id, entity_id)) {
             continue;
         }
 

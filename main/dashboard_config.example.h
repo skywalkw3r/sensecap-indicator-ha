@@ -19,6 +19,11 @@
  *  - Slots may share an entity id (e.g. two rooms showing one temperature
  *    sensor); subscribe dedupes the id, routing fans updates out to every
  *    matching slot.
+ *  - A TOGGLE/LIGHT id may be a comma-separated group ("light.a,light.b",
+ *    no spaces): the toggle and slider drive every member in one service
+ *    call and the row's state follows the most recently updated member.
+ *    Keep the list under the 96-byte ha_ws_call_req_t entity_id budget;
+ *    SENSOR/MEDIA slots stay single-entity.
  *  - A server with no switch entity: give its binary_sensor SENSOR row an
  *    action entity — the row shows live on/off and taps run the toggle
  *    script (confirm-gated). One card, two entities (Hallway page).

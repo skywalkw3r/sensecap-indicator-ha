@@ -42,11 +42,13 @@ enum {
 };
 
 /* Service-call request (payload of HA_WS_TX_CALL; esp_event copies it whole).
- * extra is "" or a complete JSON object used verbatim as service_data. */
+ * extra is "" or a complete JSON object used verbatim as service_data.
+ * entity_id may be a comma-separated group list (dashboard_config.h) — sized
+ * so a four-member light group still fits untruncated. */
 typedef struct {
     char domain[24];
     char service[32];
-    char entity_id[64];
+    char entity_id[96];
     char extra[64];
 } ha_ws_call_req_t;
 

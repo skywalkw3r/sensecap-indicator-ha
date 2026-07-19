@@ -12,6 +12,7 @@
  */
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "dashboard_config.h"
@@ -67,7 +68,21 @@ enum {
 extern const dash_slot_t dash_slots[DASH_SLOT_COUNT];
 extern const dash_room_t dash_rooms[DASH_ROOM_COUNT];
 
-/* Slot index for an incoming entity id; -1 when the id isn't on the dashboard. */
+/* A slot's entity_id may be a comma-separated member list ("light.a,light.b")
+ * for TOGGLE/LIGHT groups. Service calls send the list verbatim — HA's target
+ * validator splits on commas and fans the call out to every member — so only
+ * the subscribe/routing side needs to look inside; these helpers do that.
+ *
+ * Copies the member at `cursor` into out (truncating to out_size) and returns
+ * the cursor of the next member, or NULL after the last. Start iteration at
+ * dash_slots[i].entity_id; single-entity ids yield exactly one member. */
+const char *dash_entity_list_next(const char *cursor, char *out, size_t out_size);
+
+/* True when entity_id equals one member of `list` (or the whole single id). */
+bool dash_entity_list_has(const char *list, const char *entity_id);
+
+/* Slot index for an incoming entity id; -1 when the id isn't on the dashboard.
+ * Matches group members, so several slots sharing a member return the first. */
 int dash_slot_by_entity(const char *entity_id);
 
 /* ACTION slots are commands, not state — everything else gets subscribed. */

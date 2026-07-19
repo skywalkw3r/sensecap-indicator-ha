@@ -38,13 +38,39 @@ const dash_room_t dash_rooms[DASH_ROOM_COUNT] = {
 _Static_assert(DASH_PAGE_COUNT == DASH_ROOM_COUNT + 1,
                "dash_page enum out of sync with DASH_ROOM_LIST");
 
+const char *dash_entity_list_next(const char *cursor, char *out, size_t out_size)
+{
+    const char *comma = strchr(cursor, ',');
+    size_t      len   = (comma != NULL) ? (size_t)(comma - cursor) : strlen(cursor);
+    if (len >= out_size) {
+        len = out_size - 1;
+    }
+    memcpy(out, cursor, len);
+    out[len] = '\0';
+    return (comma != NULL) ? comma + 1 : NULL;
+}
+
+bool dash_entity_list_has(const char *list, const char *entity_id)
+{
+    size_t n = strlen(entity_id);
+    for (const char *p = list; p != NULL;) {
+        const char *comma = strchr(p, ',');
+        size_t      len   = (comma != NULL) ? (size_t)(comma - p) : strlen(p);
+        if (len == n && memcmp(p, entity_id, n) == 0) {
+            return true;
+        }
+        p = (comma != NULL) ? comma + 1 : NULL;
+    }
+    return false;
+}
+
 int dash_slot_by_entity(const char *entity_id)
 {
     if (entity_id == NULL) {
         return -1;
     }
     for (int i = 0; i < DASH_SLOT_COUNT; i++) {
-        if (strcmp(dash_slots[i].entity_id, entity_id) == 0) {
+        if (dash_entity_list_has(dash_slots[i].entity_id, entity_id)) {
             return i;
         }
     }

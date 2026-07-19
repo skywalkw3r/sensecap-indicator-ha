@@ -42,6 +42,7 @@ ICONS = [
     ("UI_ICON_FLOOR_LAMP",      "floor-lamp",           False),
     ("UI_ICON_DESK_LAMP",       "desk-lamp",            False),
     ("UI_ICON_CEILING_LIGHT",   "ceiling-light",        False),
+    ("UI_ICON_OUTDOOR_LAMP",    "outdoor-lamp",         False),
     ("UI_ICON_WALL_SCONCE",     "wall-sconce",          False),
     ("UI_ICON_IMAGE",           "image",                True),
     ("UI_ICON_SERVER",          "server",               True),

@@ -24,6 +24,7 @@ LV_FONT_DECLARE(ui_font_mdi_48);
 #define UI_ICON_FLOOR_LAMP       "\xF3\xB0\xA3\x9D" /* U+F08DD mdi:floor-lamp */
 #define UI_ICON_DESK_LAMP        "\xF3\xB0\xA5\x9F" /* U+F095F mdi:desk-lamp */
 #define UI_ICON_CEILING_LIGHT    "\xF3\xB0\x9D\xA9" /* U+F0769 mdi:ceiling-light */
+#define UI_ICON_OUTDOOR_LAMP     "\xF3\xB1\x81\x94" /* U+F1054 mdi:outdoor-lamp */
 #define UI_ICON_WALL_SCONCE      "\xF3\xB0\xA4\x9C" /* U+F091C mdi:wall-sconce */
 #define UI_ICON_IMAGE            "\xF3\xB0\x8B\xA9" /* U+F02E9 mdi:image [48] */
 #define UI_ICON_SERVER           "\xF3\xB0\x92\x8B" /* U+F048B mdi:server [48] */
