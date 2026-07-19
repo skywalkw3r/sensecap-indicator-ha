@@ -34,10 +34,11 @@ extern "C" {
 ESP_EVENT_DECLARE_BASE(HA_WS_EVENT_BASE);
 
 enum {
-    HA_WS_CFG_CHANGED, /* config saved: clear auth latch, rebuild client */
-    HA_WS_NET_UP,      /* station got an IP: start the client if enabled+idle */
-    HA_WS_AUTH_FAIL,   /* auth_invalid from HA: teardown + terminal latch */
-    HA_WS_TX_CALL,     /* queued service call; payload ha_ws_call_req_t */
+    HA_WS_CFG_CHANGED,   /* config saved: clear auth latch, rebuild client */
+    HA_WS_NET_UP,        /* station got an IP: start the client if enabled+idle */
+    HA_WS_AUTH_FAIL,     /* auth_invalid from HA: teardown + terminal latch */
+    HA_WS_TX_CALL,       /* queued service call; payload ha_ws_call_req_t */
+    HA_WS_STALE_HANDSHAKE, /* watchdog: not SUBSCRIBED in time — rebuild */
 };
 
 /* Service-call request (payload of HA_WS_TX_CALL; esp_event copies it whole).

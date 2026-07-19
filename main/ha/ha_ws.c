@@ -9,6 +9,7 @@
 #include "esp_event.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_websocket_client.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -83,6 +84,37 @@ static media_cache_t s_media[DASH_SLOT_COUNT];
  * task) against writes from ha_event_task and the WS task. */
 static ha_ws_status_snapshot_t s_snapshot;
 static portMUX_TYPE            s_snapshot_mux = portMUX_INITIALIZER_UNLOCKED;
+
+/* Handshake watchdog. The first connection after boot has been observed to
+ * wedge in AUTHENTICATING with the transport healthy (pings answered) but
+ * HA's auth reply never arriving — so neither the pong deadline nor the
+ * library's reconnect can save it. If SUBSCRIBED isn't reached within the
+ * deadline, hop to ha_event_task and rebuild the client from scratch; the
+ * warm retry has always connected in well under a second. */
+#define HA_WS_HANDSHAKE_DEADLINE_US (20 * 1000 * 1000)
+static esp_timer_handle_t s_handshake_timer = NULL;
+
+static void _handshake_timer_cb(void *arg)
+{
+    (void)arg;
+    esp_event_post_to(ha_cfg_event_handle, HA_WS_EVENT_BASE, HA_WS_STALE_HANDSHAKE,
+                      NULL, 0, pdMS_TO_TICKS(100));
+}
+
+static void _handshake_watchdog_arm(void)
+{
+    if (s_handshake_timer != NULL) {
+        esp_timer_stop(s_handshake_timer); /* no-op if not running */
+        esp_timer_start_once(s_handshake_timer, HA_WS_HANDSHAKE_DEADLINE_US);
+    }
+}
+
+static void _handshake_watchdog_disarm(void)
+{
+    if (s_handshake_timer != NULL) {
+        esp_timer_stop(s_handshake_timer);
+    }
+}
 
 static void _ws_apply_config(void);
 
@@ -466,6 +498,7 @@ static void _handle_message(const char *buf, size_t len)
         if (id == s_subscribe_id) {
             if (success) {
                 ESP_LOGI(TAG, "subscribed — live entity updates streaming");
+                _handshake_watchdog_disarm();
                 _status_set(HA_WS_STATUS_SUBSCRIBED);
             } else {
                 /* Healthy connection, bad command (e.g. malformed entity id).
@@ -553,6 +586,7 @@ static void _ws_event_handler(void *handler_args, esp_event_base_t base, int32_t
             /* Fresh subscribe = fresh snapshot: invalidate the media cache so
              * an identical post-reconnect state still reposts to the UI. */
             memset(s_media, 0, sizeof(s_media));
+            _handshake_watchdog_arm();
             _status_set(HA_WS_STATUS_AUTHENTICATING);
             break;
         case WEBSOCKET_EVENT_DATA:
@@ -584,6 +618,7 @@ static void _ws_event_handler(void *handler_args, esp_event_base_t base, int32_t
 
 static void _ws_teardown(void)
 {
+    _handshake_watchdog_disarm();
     if (s_client != NULL) {
         esp_websocket_client_stop(s_client);
         esp_websocket_client_destroy(s_client);
@@ -647,6 +682,11 @@ static void _ws_apply_config(void)
         .reconnect_timeout_ms = 10000,
         .network_timeout_ms = 10000,
         .ping_interval_sec = 10,
+        /* Without a pong deadline a half-open link (peer gone, no FIN seen)
+         * wedges forever in AUTHENTICATING: pings keep flowing into the void
+         * and no DISCONNECTED event ever fires. Two missed pongs = teardown,
+         * which hands recovery to the library's auto-reconnect. */
+        .pingpong_timeout_sec = 20,
     };
 
     /* TLS trust wiring — wss:// only; shares the MQTT trust settings
@@ -785,6 +825,13 @@ static void _lifecycle_event_handler(void *handler_args, esp_event_base_t base, 
                 _send_service_call((const ha_ws_call_req_t *)event_data);
             }
             break;
+        case HA_WS_STALE_HANDSHAKE:
+            if (s_client != NULL && s_enabled && _status_get() != HA_WS_STATUS_SUBSCRIBED) {
+                ESP_LOGW(TAG, "handshake stalled (not subscribed after %d s) — rebuilding client",
+                         (int)(HA_WS_HANDSHAKE_DEADLINE_US / 1000000));
+                _ws_apply_config();
+            }
+            break;
         default:
             break;
     }
@@ -819,6 +866,12 @@ int ha_ws_init(void)
     taskENTER_CRITICAL(&s_snapshot_mux);
     s_snapshot.status = initial;
     taskEXIT_CRITICAL(&s_snapshot_mux);
+
+    const esp_timer_create_args_t watchdog_args = {
+        .callback = _handshake_timer_cb,
+        .name = "ha-ws-handshake",
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&watchdog_args, &s_handshake_timer));
 
     /* Lifecycle runs on ha_event_task (loop created by indicator_ha_model_init
      * before this call); the client starts once the station has an IP. */
