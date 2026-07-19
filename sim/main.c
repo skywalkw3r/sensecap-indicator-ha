@@ -81,6 +81,14 @@ int main(void) {
                           VIEW_EVENT_SCREEN_START, &screen, sizeof(screen), 0);
     }
 
+    /* SIM_OPEN_DISPLAY=1: open the Display settings modal the same way. */
+    const char *open_display = getenv("SIM_OPEN_DISPLAY");
+    if (open_display && *open_display) {
+        uint8_t screen = SCREEN_DISPLAY_MODAL;
+        esp_event_post_to(view_event_handle, VIEW_EVENT_BASE,
+                          VIEW_EVENT_SCREEN_START, &screen, sizeof(screen), 0);
+    }
+
     /* SIM_START_TILE=<n>: jump to nav tile n before the screenshot warm-up,
      * so headless captures can preview any page. */
     const char *start_tile = getenv("SIM_START_TILE");
