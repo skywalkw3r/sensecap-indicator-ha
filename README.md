@@ -2,13 +2,14 @@
 
 [![CI](https://github.com/skywalkw3r/sensecap-indicator-ha/actions/workflows/ci.yml/badge.svg)](https://github.com/skywalkw3r/sensecap-indicator-ha/actions/workflows/ci.yml)
 
-Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) into a Home Assistant companion panel. Connects to Wi-Fi, renders touch controls that Home Assistant can drive both ways over MQTT, and displays HA-pushed values (temperature, humidity, CO₂) on screen. On sensor-equipped variants it also publishes the built-in sensor readings.
+Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) into a Home Assistant companion panel. It joins your Wi-Fi and talks to Home Assistant over your choice of two transports — classic **MQTT** (switch entities driven both ways, display values pushed by an automation, buzzer as a siren entity) or HA's native **WebSocket API** (the panel subscribes to entities directly; no broker or automation needed for live values). Touch controls, live temperature/humidity/CO₂ tiles, and a rolling Trends chart render on the 480×480 panel. All connections are outbound from the device; it opens no network ports.
 
 <figure class="third">
     <img align="left" src="./assets/loft-controls.png" width="240"/>
     <img align="center" src="./assets/general-controls.png" width="240"/>
     <img align="left" src="./assets/trends.png" width="240"/>
     <img align="center" src="./assets/mqtt-address-panel.png" width="240"/>
+    <img align="left" src="./assets/ha-websocket-status.png" width="240"/>
 </figure>
 
 
@@ -19,7 +20,7 @@ Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudi
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
-- [MQTT Protocol](#mqtt-protocol)
+- [Talking to Home Assistant](#talking-to-home-assistant)
 - [Home Assistant Setup](#home-assistant-setup)
 - [Build & Flash](#build--flash)
 - [Console Commands](#console-commands)
@@ -31,18 +32,31 @@ Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudi
 
 ## Features
 
-- [x] MQTT broker integration (configurable address, port, client ID, username, password)
-- [x] HA-pushed display values (`indicator/display/set`): temperature, humidity, CO₂ rendered on the panel
-- [x] Built-in sensor publishing on sensor-equipped variants (SCD41 CO₂, SGP40 tVOC, SHT41 temp/humidity) — the base D1 this fork targets has none, so that pipeline idles
-- [x] Three swipeable pages: Loft Controls (temp/humidity/CO₂ + LED strip + brightness), General Controls (All Lights with confirm, Xmas Lights), and a Trends history chart
-- [x] All 8 MQTT switch entities remain addressable (switch1–3 have no on-screen widget but keep their topics)
-- [x] Wi-Fi and MQTT configuration from the touchscreen
-- [x] MQTT broker configuration from the serial console (`setmqtt`, `mqtthelp`)
-- [x] NVS-backed persistence for Wi-Fi credentials, MQTT config, switch state
-- [x] Display brightness and sleep-mode controls
-- [x] PC simulator for iterating on the UI without flashing hardware
-- [x] Home Assistant WebSocket API client — live temp/humidity/CO₂ straight from HA entities, no broker or automation needed; console toggle runs MQTT or WebSocket one-at-a-time (see [Option B](#option-b--native-websocket-no-broker-needed-for-live-values))
+**On-screen**
+
+- Three swipeable pages: Loft Controls (temp/humidity/CO₂ + LED strip + brightness), General Controls (All Lights with confirm, Xmas Lights), and a Trends history chart (last 120 samples per series)
+- Settings modal: Wi-Fi, Display (brightness/sleep), MQTT broker, and a live Home Assistant WebSocket status card
+- Display brightness and sleep-mode controls
+
+**Home Assistant integration**
+
+- [x] MQTT client — 8 addressable switch entities (switch1–3 keep their topics without an on-screen widget), display values via `indicator/display/set`, sensor publishing on Grove-equipped variants (the base D1 has none, so that pipeline idles)
+- [x] Buzzer exposed as an HA MQTT siren entity (`beep`/`doorbell`/`alarm` tones, console-testable via `beep`)
+- [x] Home Assistant WebSocket API client — live temp/humidity/CO₂ straight from HA entities with a long-lived access token; no broker or automation YAML
+- [x] One-at-a-time transport toggle (`setha --enable` ⇄ `setha --disable` / `setmqtt --enable`)
+- [x] Optional TLS for both transports (`mqtts://`, `wss://`): CA provisioning over serial, public CA bundle fallback, explicit insecure opt-out
 - [ ] REST API
+
+**Configuration & operations**
+
+- Wi-Fi and MQTT broker setup from the touchscreen; everything (including WebSocket and TLS) from the serial console
+- NVS-backed persistence for Wi-Fi credentials, MQTT config, WebSocket config, switch state
+- No compiled-in defaults: an unconfigured device stays idle and never phones home
+
+**Development**
+
+- PC simulator (SDL2) for iterating on the UI without flashing hardware
+- `./dev` wrapper for build/flash/monitor on both MCUs
 
 ---
 
@@ -57,7 +71,7 @@ cd sensecap-indicator-ha
 ./dev monitor          # Ctrl-] to exit
 ```
 
-After flashing, configure Wi-Fi and MQTT broker on the device, then continue to [Home Assistant Setup](#home-assistant-setup). Both can also be set from the serial console — see [Console Commands](#console-commands).
+After flashing, configure Wi-Fi from the touchscreen, then pick a transport in [Home Assistant Setup](#home-assistant-setup): MQTT broker (touchscreen or `setmqtt`) or native WebSocket (`setha`). Everything can be driven from the serial console — see [Console Commands](#console-commands).
 
 ---
 
@@ -67,10 +81,10 @@ The SenseCAP Indicator is a dual-MCU device:
 
 | MCU | Role | Key resources |
 |-----|------|---------------|
-| **ESP32-S3** | Display, touch, Wi-Fi, MQTT, Home Assistant logic | 8 MB flash, PSRAM @ 120 MHz OCT mode, 240 MHz CPU |
-| **RP2040** | Sensor acquisition on Grove ports | Reads CO₂, tVOC, temperature, humidity; relays to ESP32-S3 over UART |
+| **ESP32-S3** | Display, touch, Wi-Fi, MQTT + WebSocket clients, Home Assistant logic | 8 MB flash, PSRAM @ 120 MHz OCT mode, 240 MHz CPU |
+| **RP2040** | Sensor acquisition on Grove ports, buzzer | Reads CO₂, tVOC, temperature, humidity; relays to ESP32-S3 over UART |
 
-The two chips communicate over a COBS-framed UART link. All Grove sensor access goes through the RP2040; the ESP32-S3 never reads sensors directly. On the base D1 (no bundled Grove sensors) this link simply idles, and the on-screen temperature/humidity/CO₂ come from Home Assistant via `indicator/display/set` instead.
+The two chips communicate over a COBS-framed UART link. All Grove sensor and buzzer access goes through the RP2040; the ESP32-S3 never touches that hardware directly. On the base D1 (no bundled Grove sensors) the link carries only buzzer commands, and the on-screen temperature/humidity/CO₂ come from Home Assistant instead.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -80,7 +94,8 @@ The two chips communicate over a COBS-framed UART link. All Grove sensor access 
 │  │  Model   │◄─────loop────►│   View   │            │
 │  │ (state,  │               │ (LVGL,   │            │
 │  │  NVS,    │               │  touch   │            │
-│  │  MQTT)   │               │  input)  │            │
+│  │  MQTT,   │               │  input)  │            │
+│  │  WS)     │               │          │            │
 │  └────┬─────┘               └──────────┘            │
 │       │ UART / COBS                                  │
 └───────┼─────────────────────────────────────────────┘
@@ -99,26 +114,41 @@ The two chips communicate over a COBS-framed UART link. All Grove sensor access 
 
 Each application domain has a paired `*_model.c` and `*_view.c`:
 
-- **Model** — owns state, NVS reads/writes, MQTT publish/subscribe, RP2040 packet parsing
+- **Model** — owns state, NVS reads/writes, MQTT/WebSocket traffic, RP2040 packet parsing
 - **View** — owns LVGL object updates, touch callbacks, screen transitions
 
 Model and view communicate exclusively through the **ESP event loop** with typed event IDs and payloads defined in `main/view_data.h`. Neither side calls the other's functions directly.
 
-SquareLine Studio-generated files in `main/ui/` are treated as assets. Custom logic goes in `*_view.c` files, not in the generated screens.
-
-For per-domain locations and architecture rules, see [`AGENTS.md`](AGENTS.md).
+For per-domain locations and architecture rules, see [`AGENTS.md`](AGENTS.md); the HA domain has its own map in [`main/ha/README.md`](main/ha/README.md).
 
 ---
 
-## MQTT Protocol
+## Talking to Home Assistant
 
-Three fixed topics carry all communication:
+The device speaks two transports and runs **one at a time**:
+
+| Transport | Carries | Needs on the HA side |
+|-----------|---------|----------------------|
+| **MQTT** (default) | Switch entities both ways, display values, siren, sensor publishing | Broker + MQTT integration (+ an automation for display values) |
+| **WebSocket** | Live display values (temp/humidity/CO₂ tiles + Trends) | Nothing but a long-lived access token |
+
+`setha --enable` switches to WebSocket (the MQTT client stops, so switch entities pause); `setha --disable` or `setmqtt --enable` switches back. The Settings → *Home Asst* card always shows which side is active.
+
+### MQTT topics
 
 | Direction | Topic | Example payload |
 |-----------|-------|-----------------|
 | Device → HA (sensors) | `indicator/sensor` | `{"temp":"23.5","humidity":"45","co2":"450","tvoc":"100"}` |
 | HA → Device (commands) | `indicator/switch/set` | `{"switch1":1,"switch5":50}` |
 | Device → HA (state echo) | `indicator/switch/state` | `{"switch1":1,"switch2":0}` |
+| HA → Device (display values) | `indicator/display/set` | `{"loft_temp":72.4,"loft_humidity":45,"loft_co2":620}` |
+| HA → Device (buzzer siren) | `indicator/siren/set` | `{"state":"ON","tone":"alarm","duration":15}` — or bare `ON`/`OFF` |
+| Device → HA (siren state) | `indicator/siren/state` | `{"state":"ON","tone":"alarm"}` / `{"state":"OFF"}` |
+
+**Siren tones:** `beep` (single chirp, default), `doorbell` (double chirp), `alarm`
+(repeating chirp for `duration` seconds — default 10, max 120; stop early with
+`OFF`). The buzzer lives on the RP2040, so sounds are short 50 ms chirps
+sequenced over the inter-chip UART link.
 
 **Sensor keys:** `temp`, `humidity`, `co2`, `tvoc`
 
@@ -129,22 +159,19 @@ Three fixed topics carry all communication:
 | `switch1`–`switch4`, `switch6`–`switch7` | Binary switch | `0` / `1` |
 | `switch5`, `switch8` | Numeric slider | integer value |
 
+### WebSocket
+
+The device connects out to `ws(s)://<ha>:8123/api/websocket`, authenticates with a long-lived token, and issues one `subscribe_entities` for up to three configured entity IDs (temperature, humidity, CO₂ slots). Home Assistant pushes an initial snapshot and then every state change instantly — the same pipeline (tiles + Trends) consumes them, so the UI doesn't care which transport is active. While WebSocket is enabled, `indicator/display/set` is ignored so the history chart is never double-fed.
+
 ---
 
 ## Home Assistant Setup
 
-The device speaks two transports and runs **one at a time**: MQTT (switch
-entities + display values pushed by an HA automation, Option A) or the native
-WebSocket client (subscribes to HA entities directly, Option B — simpler for
-live values, no broker or automation YAML, but the MQTT switch entities pause
-while it is active). `setha --enable` switches to WebSocket, `setha --disable`
-or `setmqtt --enable` switches back to MQTT.
-
-### MQTT (switches, and Option A for display values)
+### Option A — MQTT
 
 1. **Install an MQTT broker** (Mosquitto is the simplest) and enable the MQTT integration in Home Assistant.
 
-2. **Point the Indicator at the broker** — from the device's MQTT screen, or via [`setmqtt`](#console-commands) over serial. The device ships with **no default broker**; until you set one it stays idle (it never connects to a public internet broker on its own). Once Wi-Fi has an IP address and a broker is configured, the client connects within seconds — internet access is not required, so isolated IoT VLANs work fine.
+2. **Point the Indicator at the broker** — from the device's MQTT screen, or via [`setmqtt`](#console-commands) over serial. The device ships with **no default broker**; until you set one it stays idle. Once Wi-Fi has an IP address and a broker is configured, the client connects within seconds — internet access is not required, so isolated IoT VLANs work fine.
 
 3. **Add MQTT entities.** Append [`examples/homeassistant/mqtt-entities.yaml`](examples/homeassistant/mqtt-entities.yaml) to your `configuration.yaml` under the `mqtt:` key, then reload MQTT.
 
@@ -156,13 +183,9 @@ See also: [Seeed wiki — Home Assistant application guide](https://wiki.seeedst
 
 ### Option B — native WebSocket (no broker needed for live values)
 
-The device connects out to HA's WebSocket API (`ws(s)://<ha>:8123/api/websocket`),
-authenticates with a long-lived access token and subscribes to up to three
-entities — HA pushes every state change instantly. No inbound port is opened on
-the device, and no HA-side automation is needed.
-
 1. **Mint a token** in Home Assistant: Profile → Security → *Long-lived access tokens* → Create token.
-2. **Configure over the serial console** (fields merge, so this can be split across commands):
+
+2. **Configure over the serial console** (fields merge into the stored config, so this can be split across commands):
 
    ```text
    setha -a 192.168.1.10 -t <long-lived-token>
@@ -170,16 +193,9 @@ the device, and no HA-side automation is needed.
    setha --enable
    ```
 
-3. **Check it**: `haconfig` prints the WS block; the Settings → *Home Asst* card on
-   the touchscreen shows live connection status. `setha --disable` switches back
-   to MQTT.
+3. **Check it**: `haconfig` prints the WebSocket block, and the Settings → *Home Asst* card on the touchscreen shows live connection status. `setha --disable` switches back to MQTT.
 
-Enabling the WebSocket client stops the MQTT client (one transport at a time),
-so the panel's MQTT switch entities pause until you switch back with
-`setha --disable` or `setmqtt --enable`. Addresses accept bare IPs
-(`192.168.1.10` → `ws://…:8123`) or TLS URLs (`wss://ha.example.com`,
-`https://xyz.ui.nabu.casa` → `wss://…:443`); `wss://` uses the same trust
-settings as `mqtts://` (see [TLS](#tls-mqtts)).
+Addresses accept bare IPs and hostnames (`192.168.1.10`, `ha.local:8123` → `ws://…:8123`) or TLS URLs (`wss://ha.example.com`, `https://xyz.ui.nabu.casa` → `wss://…:443`); `wss://` uses the same trust settings as `mqtts://` (see [TLS](#tls-mqtts-and-wss)).
 
 ---
 
@@ -230,14 +246,15 @@ Connect at the device's baud rate and use these commands:
 
 | Command | Description |
 |---------|-------------|
-| `mqtthelp` | Print broker, topic, payload and `setha` examples |
+| `mqtthelp` | Print setup examples for both transports, topics, and payloads |
 | `haconfig` | Print the current MQTT + WebSocket configuration |
 | `setmqtt -a <addr>` | Set broker address (e.g., `mqtt://192.168.1.10:1883`) |
 | `setmqtt -a <addr> -c <client-id> -u <user> -p <pass>` | Full broker configuration |
+| `setmqtt --enable` / `--disable` | Turn the MQTT client on (stops WebSocket) / off |
 | `setha -a <addr> -t <token>` | Set the HA WebSocket address + access token |
 | `setha --temp/--humidity/--co2 <entity_id>` | Map HA entities to the display tiles (`""` clears a slot) |
 | `setha --enable` / `--disable` | Switch to WebSocket / back to MQTT (one transport at a time) |
-| `setmqtt --enable` / `--disable` | Turn the MQTT client on (stops WebSocket) / off |
+| `beep [-t <tone>] [-d <seconds>]` / `beep --off` | Sound the buzzer locally (same engine as the MQTT siren) |
 
 **Examples:**
 
@@ -249,31 +266,25 @@ setha -a 192.168.1.10 -t eyJhbGciOi... --temp sensor.loft_temperature --enable
 
 After `setmqtt`/`setha` succeeds, the configuration is saved to NVS and the affected client restarts automatically.
 
-### TLS (`mqtts://`)
+### TLS (`mqtts://` and `wss://`)
 
-Use an `mqtts://` broker URL to encrypt the MQTT connection (port defaults to 8883):
+Use an `mqtts://` broker URL (port defaults to 8883) or a `wss://` WebSocket URL to encrypt the connection. Both ride on the same stored trust settings:
 
 | Command | Description |
 |---------|-------------|
 | `setmqtt -a mqtts://<host>[:port] ...` | TLS broker; server certificate is verified |
-| `setmqttca` | Paste a CA certificate PEM over the console; stored in NVS and used to verify the broker |
+| `setha -a wss://<host>[:port]` | TLS WebSocket to Home Assistant |
+| `setmqttca` | Paste a CA certificate PEM over the console; stored in NVS and used to verify the server |
 | `setmqttca -c` | Clear the stored CA (falls back to the built-in public CA bundle) |
 | `setmqtt --insecure` / `--secure` | Skip / re-enable server verification (skipping is discouraged) |
 
-Verification order: stored CA if present, otherwise the public CA bundle (for
-cloud brokers with real certificates). LAN brokers with a self-signed/private
-CA need `setmqttca`. The touchscreen MQTT page stays plaintext-only (`mqtt://`).
-The same stored trust settings (mode + CA) also govern `wss://` WebSocket
-connections to Home Assistant.
+Verification order: stored CA if present, otherwise the public CA bundle (for endpoints with real certificates — Nabu Casa, Let's Encrypt reverse proxies). LAN endpoints with a self-signed or private-CA certificate need `setmqttca` — a self-signed server certificate can be pasted directly as its own trust anchor. The touchscreen MQTT page stays plaintext-only (`mqtt://`).
 
-**With Home Assistant's Mosquitto add-on:** set `certfile`/`keyfile`/`cafile`
-in the add-on configuration to expose a TLS listener on 8883 (HA and other
-local clients can keep using 1883 internally), then paste your CA cert into
-`setmqttca` and point `setmqtt` at `mqtts://<HA-host>:8883`.
+**With Home Assistant's Mosquitto add-on:** set `certfile`/`keyfile`/`cafile` in the add-on configuration to expose a TLS listener on 8883 (HA and other local clients can keep using 1883 internally), then paste your CA cert into `setmqttca` and point `setmqtt` at `mqtts://<HA-host>:8883`.
 
 ### Security notes
 
-MQTT and Wi-Fi credentials — and the Home Assistant long-lived access token — are stored in plaintext in NVS, and the serial console is unauthenticated — anyone with physical or USB access can read them back. Use a dedicated MQTT user with a limited ACL so a leaked credential can't reach the rest of your broker, and remember the HA token can be revoked any time from the HA profile page. Before reselling or disposing of the device, run `idf.py erase-flash` to wipe stored credentials.
+Wi-Fi and MQTT credentials — and the Home Assistant long-lived access token — are stored in plaintext in NVS, and the serial console is unauthenticated: anyone with physical or USB access can read them back. Use a dedicated MQTT user with a limited ACL so a leaked credential can't reach the rest of your broker, and prefer the WebSocket token where you can — it is revocable at any time from the HA profile page. Before reselling or disposing of the device, run `idf.py erase-flash` to wipe stored credentials.
 
 ---
 
@@ -286,7 +297,7 @@ Run `idf.py menuconfig` to explore options. Notable locations:
 
 To regenerate `sdkconfig` from defaults: delete it and run `./dev build`.
 
-**MQTT broker** — there is no compiled-in default broker; a fresh device is unconfigured and stays idle until you set a broker from the touchscreen or `setmqtt`. Config is stored in NVS. If a stored config is ever unreadable or the wrong size (e.g. after a struct change), the device treats itself as unconfigured rather than falling back to any default. The client (re)starts automatically whenever Wi-Fi obtains an IP and a broker is configured, and when you save a new broker; it does not require internet reachability.
+**No compiled-in endpoints** — a fresh device is unconfigured and stays idle until you set a broker (touchscreen or `setmqtt`) or a WebSocket target (`setha`). All config is stored in NVS; if a stored blob is ever unreadable or the wrong size (e.g. after a struct change), the device treats itself as unconfigured rather than falling back to any default. Clients (re)start automatically whenever Wi-Fi obtains an IP and on every config save; internet reachability is never required.
 
 ---
 
@@ -294,12 +305,14 @@ To regenerate `sdkconfig` from defaults: delete it and run `./dev build`.
 
 **Code completion.** Install [clangd](https://github.com/clangd/clangd/releases) and the [clangd VS Code extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd). After one successful build, `build/compile_commands.json` is generated and clangd uses it automatically for ESP-IDF-aware navigation.
 
-**PC simulator.** The `sim/` directory builds a desktop version of the UI using LVGL's SDL2 backend (macOS, 480×480 window matching the real LCD). Useful for iterating on screens, fonts, and layouts without flashing.
+**PC simulator.** The `sim/` directory builds a desktop version of the UI using LVGL's SDL2 backend (macOS, 480×480 window matching the real LCD). Useful for iterating on screens, fonts, and layouts without flashing. Model/network code is stubbed; only the view layer compiles.
 
 ```bash
 cmake -S sim -B sim/build && cmake --build sim/build -j4
 ./sim/build/sensecap_sim
 ```
+
+Headless helpers (environment variables): `SIM_SCREENSHOT=<path.bmp>` captures a frame and exits (`SIM_SCREENSHOT_LAYER=top` for modals), `SIM_START_TILE=<n>` jumps to a page, and `SIM_OPEN_SETTINGS=1` / `SIM_OPEN_BROKER=1` / `SIM_OPEN_HA_WS=1` open the corresponding modal through the real event path.
 
 **Architecture rules.** See [`AGENTS.md`](AGENTS.md) for module locations, boot sequence, and the model/view boundary rules that contributors (human and AI) must follow.
 
@@ -309,7 +322,7 @@ cmake -S sim -B sim/build && cmake --build sim/build -j4
 
 | Component | Version |
 |-----------|---------|
-| Firmware (ESP32-S3) | `v1.1.0` |
+| Firmware (ESP32-S3) | `v1.1.0` + unreleased `main` |
 | Coprocessor (RP2040) | `v2.1.0` |
 | ESP-IDF | `v5.4.x` |
 | LVGL | `v9.x` (managed component) |
@@ -320,6 +333,7 @@ cmake -S sim -B sim/build && cmake --build sim/build -j4
 
 | Version | Notes |
 |---------|-------|
+| Unreleased (`main`) | Native Home Assistant WebSocket API client with one-at-a-time MQTT/WebSocket transport toggle and a live status card in Settings; optional TLS for MQTT (`mqtts://`) and WebSocket (`wss://`) with serial CA provisioning; buzzer exposed as an MQTT siren entity |
 | `v1.1.0` | Upgraded to ESP-IDF 5.4.x and LVGL 9; added `mqtthelp` console command; improved MQTT setup UX; unified build/flash tooling into `./dev` |
 | `v1.0.0` | Initial release (ESP-IDF 5.1 era, LVGL 8) |
 
