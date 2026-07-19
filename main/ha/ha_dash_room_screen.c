@@ -92,9 +92,27 @@ static void _preset_cb(lv_event_t *e)
     }
     int slot = (int)(intptr_t)lv_event_get_user_data(e);
     if (dash_slots[slot].flags & DASH_F_CONFIRM) {
-        char text[64];
-        snprintf(text, sizeof(text), "Run \"%s\"?", dash_slots[slot].label);
-        ui_confirm_msgbox("Confirm", text, "Run", UI_COLOR_RED,
+        const dash_slot_t *def = &dash_slots[slot];
+        char        text[64];
+        const char *ok       = "Run";
+        lv_color_t  ok_color = UI_COLOR_RED;
+
+        /* Status+action rows know what the tap will do — say it. LVGL task
+         * context, so reading the value label needs no lock. */
+        const char *state = (def->kind == DASH_KIND_SENSOR && s_w[slot].value != NULL)
+                                ? lv_label_get_text(s_w[slot].value)
+                                : "";
+        if (strcmp(state, "on") == 0) {
+            snprintf(text, sizeof(text), "Turn off \"%s\"?", def->label);
+            ok = "Turn Off";
+        } else if (strcmp(state, "off") == 0) {
+            snprintf(text, sizeof(text), "Turn on \"%s\"?", def->label);
+            ok       = "Turn On";
+            ok_color = UI_COLOR_GREEN;
+        } else {
+            snprintf(text, sizeof(text), "Run \"%s\"?", def->label);
+        }
+        ui_confirm_msgbox("Confirm", text, ok, ok_color,
                           _action_confirmed, (void *)(intptr_t)slot);
         return;
     }
@@ -194,6 +212,14 @@ static void _build_stat(lv_obj_t *tile, int slot, int y)
     s_w[slot].value = ui_label(card, "--", &lv_font_montserrat_24, accent);
     lv_obj_set_align(s_w[slot].value, LV_ALIGN_RIGHT_MID);
     lv_obj_set_x(s_w[slot].value, -PAD);
+
+    /* Status+action rows (e.g. the server): live state on the right, the
+     * whole card fires the paired action entity — through _preset_cb so
+     * DASH_F_CONFIRM gets its dialog. */
+    if (def->action_entity[0] != '\0') {
+        ui_make_pressable(card);
+        lv_obj_add_event_cb(card, _preset_cb, LV_EVENT_CLICKED, (void *)(intptr_t)slot);
+    }
 }
 
 /* Embedded switch styling ported from the retired control tiles (grey track,

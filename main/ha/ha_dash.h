@@ -31,6 +31,9 @@ typedef enum {
 typedef struct {
     const char *entity_id;
     const char *label;
+    const char *action_entity; /* "" = none. SENSOR rows with an action become
+                                * pressable and fire it (e.g. a server status
+                                * row whose tap runs the power-toggle script). */
     const char *icon;   /* UI_ICON_* UTF-8 glyph (render with ui_font_mdi_*) */
     const char *unit;   /* value suffix for SENSOR slots ("°F", "%", ...) */
     uint32_t    accent; /* UI_HEX_* raw 24-bit colour */
@@ -48,7 +51,7 @@ typedef struct {
 
 /* Slot / room ids straight from the config tables (SLOT_*, DASH_ROOM_*). */
 enum {
-#define X(sym, page, kind, entity, label, icon, accent, unit, legacy, flags) sym,
+#define X(sym, page, kind, entity, label, icon, accent, unit, legacy, flags, action) sym,
     DASH_SLOT_LIST
 #undef X
         DASH_SLOT_COUNT
@@ -73,9 +76,11 @@ bool dash_slot_subscribable(int slot);
 /* The DASH_F_ROOM_TEMP sensor shown on `room`'s Home card; -1 if none. */
 int dash_room_temp_slot(int room);
 
-/* Fire an ACTION slot with the domain-appropriate service: automations are
+/* Fire a slot's action with the domain-appropriate service: automations are
  * *triggered* (turn_on would merely re-enable them); scripts/scenes run via
- * turn_on. Safe from any task (queues through ha_ws_call). */
+ * turn_on. ACTION slots fire their entity_id; other kinds fire their
+ * action_entity (no-op when empty). Safe from any task (queues through
+ * ha_ws_call). */
 void dash_action_call(int slot);
 
 /* Register the MQTT-mode bridge (see ha_dash.c). Called from

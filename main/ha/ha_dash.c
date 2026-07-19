@@ -11,9 +11,10 @@
 /* Registry arrays expanded from dashboard_config.h. */
 
 const dash_slot_t dash_slots[DASH_SLOT_COUNT] = {
-#define X(sym, page_, kind_, entity_, label_, icon_, accent_, unit_, legacy_, flags_) \
-    [sym] = {.entity_id = entity_,                                                     \
-             .label     = label_,                                                      \
+#define X(sym, page_, kind_, entity_, label_, icon_, accent_, unit_, legacy_, flags_, action_) \
+    [sym] = {.entity_id     = entity_,                                                 \
+             .label         = label_,                                                  \
+             .action_entity = action_,                                                 \
              .icon      = icon_,                                                       \
              .unit      = unit_,                                                       \
              .accent    = accent_,                                                     \
@@ -69,10 +70,14 @@ int dash_room_temp_slot(int room)
 
 void dash_action_call(int slot)
 {
-    if (slot < 0 || slot >= DASH_SLOT_COUNT || dash_slots[slot].kind != DASH_KIND_ACTION) {
+    if (slot < 0 || slot >= DASH_SLOT_COUNT) {
         return;
     }
-    const char *id  = dash_slots[slot].entity_id;
+    const dash_slot_t *def = &dash_slots[slot];
+    const char *id = (def->kind == DASH_KIND_ACTION) ? def->entity_id : def->action_entity;
+    if (id == NULL || id[0] == '\0') {
+        return;
+    }
     const char *dot = strchr(id, '.');
 
     char   domain[24] = "script";
