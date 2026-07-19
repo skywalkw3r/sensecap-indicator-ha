@@ -34,15 +34,17 @@ Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudi
 
 **On-screen**
 
-- Three swipeable pages: Loft Controls (temp/humidity/CO₂ + LED strip + brightness), General Controls (All Lights with confirm, Xmas Lights), and a Trends history chart (last 120 samples per series)
+- Home-Assistant-style dashboard: a Home page (quick-action chips + a 2×2 grid of room cards with live temperatures) and one swipeable page per room — tap a room card or swipe to navigate
+- Room pages render from a compile-time table ([`main/dashboard_config.h`](main/dashboard_config.h)): hero temperature, stat rows, switches, a light card with brightness slider, a media-player card with playlist preset chips
+- Material Design Icons subset baked in (`scripts/gen_mdi_font.py`), accent-tinted per room
+- Trends history chart (last 120 samples per series) on the final page
 - Settings modal: Wi-Fi, Display (brightness/sleep), MQTT broker, and a live Home Assistant WebSocket status card
-- Display brightness and sleep-mode controls
 
 **Home Assistant integration**
 
-- [x] MQTT client — 8 addressable switch entities (switch1–3 keep their topics without an on-screen widget), display values via `indicator/display/set`, sensor publishing on Grove-equipped variants (the base D1 has none, so that pipeline idles)
+- [x] Home Assistant WebSocket API client — subscribes to every dashboard entity with a long-lived access token and calls HA services (`light.turn_on`, `script.turn_on`, `media_player.media_play_pause`, …) straight from the panel; two-way state sync, no broker or automation YAML
+- [x] MQTT client — display values via `indicator/display/set` (read-only fallback when WebSocket is off), sensor publishing on Grove-equipped variants (the base D1 has none, so that pipeline idles). The old `switch1..8` topic bridge was deliberately retired in favour of WebSocket service calls
 - [x] Buzzer exposed as an HA MQTT siren entity (`beep`/`doorbell`/`alarm` tones, console-testable via `beep`)
-- [x] Home Assistant WebSocket API client — live temp/humidity/CO₂ straight from HA entities with a long-lived access token; no broker or automation YAML
 - [x] One-at-a-time transport toggle (`setha --enable` ⇄ `setha --disable` / `setmqtt --enable`)
 - [x] Optional TLS for both transports (`mqtts://`, `wss://`): CA provisioning over serial, public CA bundle fallback, explicit insecure opt-out
 - [ ] REST API
@@ -50,8 +52,9 @@ Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudi
 **Configuration & operations**
 
 - Wi-Fi and MQTT broker setup from the touchscreen; everything (including WebSocket and TLS) from the serial console
-- NVS-backed persistence for Wi-Fi credentials, MQTT config, WebSocket config, switch state
-- No compiled-in defaults: an unconfigured device stays idle and never phones home
+- NVS-backed persistence for Wi-Fi credentials, MQTT config, WebSocket config
+- Dashboard rooms/entities are compile-time (`main/dashboard_config.h`) — fill in your entity ids once, rebuild, flash
+- No compiled-in connection defaults: an unconfigured device stays idle and never phones home
 
 **Development**
 
@@ -129,21 +132,24 @@ The device speaks two transports and runs **one at a time**:
 
 | Transport | Carries | Needs on the HA side |
 |-----------|---------|----------------------|
-| **MQTT** (default) | Switch entities both ways, display values, siren, sensor publishing | Broker + MQTT integration (+ an automation for display values) |
-| **WebSocket** | Live display values (temp/humidity/CO₂ tiles + Trends) | Nothing but a long-lived access token |
+| **WebSocket** (the dashboard's transport) | Every dashboard entity both ways: live states in, service calls out | Nothing but a long-lived access token |
+| **MQTT** (read-only fallback) | Loft display values, siren, sensor publishing | Broker + MQTT integration (+ an automation for display values) |
 
-`setha --enable` switches to WebSocket (the MQTT client stops, so switch entities pause); `setha --disable` or `setmqtt --enable` switches back. The Settings → *Home Asst* card always shows which side is active.
+`setha --enable` switches to WebSocket (the MQTT client stops); `setha --disable` or `setmqtt --enable` switches back — the dashboard then degrades to read-only Loft values + Trends, and its controls are inert. The Settings → *Home Asst* card always shows which side is active.
 
 ### MQTT topics
 
 | Direction | Topic | Example payload |
 |-----------|-------|-----------------|
 | Device → HA (sensors) | `indicator/sensor` | `{"temp":"23.5","humidity":"45","co2":"450","tvoc":"100"}` |
-| HA → Device (commands) | `indicator/switch/set` | `{"switch1":1,"switch5":50}` |
-| Device → HA (state echo) | `indicator/switch/state` | `{"switch1":1,"switch2":0}` |
 | HA → Device (display values) | `indicator/display/set` | `{"loft_temp":72.4,"loft_humidity":45,"loft_co2":620}` |
 | HA → Device (buzzer siren) | `indicator/siren/set` | `{"state":"ON","tone":"alarm","duration":15}` — or bare `ON`/`OFF` |
 | Device → HA (siren state) | `indicator/siren/state` | `{"state":"ON","tone":"alarm"}` / `{"state":"OFF"}` |
+
+The legacy `indicator/switch/set` / `indicator/switch/state` bridge (8 numbered
+switch slots + one HA automation per entity) was retired: dashboard controls
+now call HA services directly over the WebSocket, which also pushes true entity
+state back to the panel (toggling from the HA app updates the panel instantly).
 
 **Siren tones:** `beep` (single chirp, default), `doorbell` (double chirp), `alarm`
 (repeating chirp for `duration` seconds — default 10, max 120; stop early with
@@ -152,16 +158,11 @@ sequenced over the inter-chip UART link.
 
 **Sensor keys:** `temp`, `humidity`, `co2`, `tvoc`
 
-**Control keys:**
-
-| Key | HA entity type | Range |
-|-----|---------------|-------|
-| `switch1`–`switch4`, `switch6`–`switch7` | Binary switch | `0` / `1` |
-| `switch5`, `switch8` | Numeric slider | integer value |
-
 ### WebSocket
 
-The device connects out to `ws(s)://<ha>:8123/api/websocket`, authenticates with a long-lived token, and issues one `subscribe_entities` for up to three configured entity IDs (temperature, humidity, CO₂ slots). Home Assistant pushes an initial snapshot and then every state change instantly — the same pipeline (tiles + Trends) consumes them, so the UI doesn't care which transport is active. While WebSocket is enabled, `indicator/display/set` is ignored so the history chart is never double-fed.
+The device connects out to `ws(s)://<ha>:8123/api/websocket`, authenticates with a long-lived token, and issues one `subscribe_entities` covering every subscribable dashboard slot (`main/dashboard_config.h`). Home Assistant pushes an initial snapshot and then every state change instantly; media players additionally carry `media_title`/`media_artist` through attribute diffs. Slots flagged with a legacy display index keep feeding the Trends history exactly like the MQTT path, so the chart doesn't care which transport is active — and while WebSocket is enabled, `indicator/display/set` is ignored so the history is never double-fed.
+
+Controls go the other way as `call_service` frames — toggles use `homeassistant.turn_on/turn_off`, the brightness slider `light.turn_on` with `brightness_pct`, presets and *All Lights Off* run scripts, the media card `media_player.media_play_pause`. The panel paints optimistically and the subscription echo reconciles the true state.
 
 ---
 
@@ -185,15 +186,16 @@ See also: [Seeed wiki — Home Assistant application guide](https://wiki.seeedst
 
 1. **Mint a token** in Home Assistant: Profile → Security → *Long-lived access tokens* → Create token.
 
-2. **Configure over the serial console** (fields merge into the stored config, so this can be split across commands):
+2. **Fill in your entities** — edit the room/slot tables in [`main/dashboard_config.h`](main/dashboard_config.h) (the shipped ids are placeholders), then rebuild + flash. Rooms, icons, accent colours, switches, the light, media player and preset scripts all live in that one file.
+
+3. **Configure the connection over the serial console** (fields merge into the stored config, so this can be split across commands):
 
    ```text
    setha -a 192.168.1.10 -t <long-lived-token>
-   setha --temp sensor.loft_temperature --humidity sensor.loft_humidity --co2 sensor.loft_co2
    setha --enable
    ```
 
-3. **Check it**: `haconfig` prints the WebSocket block, and the Settings → *Home Asst* card on the touchscreen shows live connection status. `setha --disable` switches back to MQTT.
+4. **Check it**: `haconfig` prints the WebSocket block, and the Settings → *Home Asst* card on the touchscreen shows live connection status. `setha --disable` switches back to MQTT.
 
 Addresses accept bare IPs and hostnames (`192.168.1.10`, `ha.local:8123` → `ws://…:8123`) or TLS URLs (`wss://ha.example.com`, `https://xyz.ui.nabu.casa` → `wss://…:443`); `wss://` uses the same trust settings as `mqtts://` (see [TLS](#tls-mqtts-and-wss)).
 
@@ -251,8 +253,7 @@ Connect at the device's baud rate and use these commands:
 | `setmqtt -a <addr>` | Set broker address (e.g., `mqtt://192.168.1.10:1883`) |
 | `setmqtt -a <addr> -c <client-id> -u <user> -p <pass>` | Full broker configuration |
 | `setmqtt --enable` / `--disable` | Turn the MQTT client on (stops WebSocket) / off |
-| `setha -a <addr> -t <token>` | Set the HA WebSocket address + access token |
-| `setha --temp/--humidity/--co2 <entity_id>` | Map HA entities to the display tiles (`""` clears a slot) |
+| `setha -a <addr> -t <token>` | Set the HA WebSocket address + access token (dashboard entities are compile-time: `main/dashboard_config.h`) |
 | `setha --enable` / `--disable` | Switch to WebSocket / back to MQTT (one transport at a time) |
 | `beep [-t <tone>] [-d <seconds>]` / `beep --off` | Sound the buzzer locally (same engine as the MQTT siren) |
 

@@ -33,6 +33,17 @@ void ui_make_pressable(lv_obj_t *obj);
  * feedback on a checkable card. */
 void ui_make_checkable(lv_obj_t *obj, lv_color_t accent);
 
+/* Accent-tinted circular badge (soft accent fill, accent glyph) holding one
+ * MDI icon. Non-clickable so taps fall through to the card underneath. */
+lv_obj_t *ui_icon_badge(lv_obj_t *parent, const char *glyph,
+                        const lv_font_t *font, lv_color_t accent, int32_t diameter);
+
+/* Pressable chip: MDI glyph on top, caption underneath (wraps, centred).
+ * Child order contract: 0 = glyph label, 1 = caption label. Caller sizes the
+ * chip, wires LV_EVENT_* and (for toggles) layers ui_make_checkable on top. */
+lv_obj_t *ui_chip(lv_obj_t *parent, const char *glyph,
+                  const lv_font_t *glyph_font, const char *text);
+
 /* Transparent full-width header bar (UI_HEADER_HEIGHT tall) with a centred
  * title. For the swipeable page tiles. Returns the header container. */
 lv_obj_t *ui_header(lv_obj_t *parent, const char *title);

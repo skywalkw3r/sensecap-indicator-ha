@@ -4,6 +4,7 @@
 
 #include "esp_log.h"
 #include "ha_config.h"
+#include "ha_dash.h"
 #include "ha_ws.h"
 #include "lv_port.h"
 #include "ui_components.h"
@@ -16,7 +17,7 @@ static lv_obj_t *s_modal = NULL;
 static lv_obj_t *s_status_value = NULL;
 static lv_obj_t *s_mqtt_value = NULL;
 static lv_obj_t *s_url_value = NULL;
-static lv_obj_t *s_entity_value[HA_WS_ENTITY_NUM] = {NULL, NULL, NULL};
+static lv_obj_t *s_entities_value = NULL;
 
 /* View-local mirror of the model's status meaning: text + accent per state.
  * Values follow ha_ws_status_t (ha_ws.h). */
@@ -64,10 +65,16 @@ static void _refresh(void)
     lv_obj_set_style_text_color(s_mqtt_value, mqtt_on ? UI_COLOR_GREEN : UI_COLOR_TEXT_MUTED,
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_label_set_text(s_url_value, snap.url[0] ? snap.url : "(not set)");
-    for (int i = 0; i < HA_WS_ENTITY_NUM; i++) {
-        lv_label_set_text(s_entity_value[i],
-                          snap.entity_id[i][0] ? snap.entity_id[i] : "(not set)");
+
+    /* Entities are a compile-time table now (dashboard_config.h); show the
+     * subscription size rather than three fixed ids. */
+    int subscribable = 0;
+    for (int i = 0; i < DASH_SLOT_COUNT; i++) {
+        if (dash_slot_subscribable(i)) {
+            subscribable++;
+        }
     }
+    lv_label_set_text_fmt(s_entities_value, "%d dashboard slots (compile-time)", subscribable);
 }
 
 static void _on_back(lv_event_t *e)
@@ -112,9 +119,7 @@ static void _ensure_modal(void)
     s_status_value = _add_row(card, "WebSocket status");
     s_mqtt_value = _add_row(card, "MQTT client");
     s_url_value = _add_row(card, "Server");
-    s_entity_value[0] = _add_row(card, "Temperature entity");
-    s_entity_value[1] = _add_row(card, "Humidity entity");
-    s_entity_value[2] = _add_row(card, "CO2 entity");
+    s_entities_value = _add_row(card, "Entities");
 
     lv_obj_t *hint = ui_label(card, "Console setup: 'setha' (see 'mqtthelp')",
                               UI_FONT_BODY, UI_COLOR_TEXT_MUTED);

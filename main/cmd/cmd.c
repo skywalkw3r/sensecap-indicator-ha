@@ -22,20 +22,20 @@ static const char *TAG = "CMD_RESP";
 static ha_cfg_interface ha_cfg;
 
 static void print_ha_ws_usage(void) {
-    printf("\nHome Assistant WebSocket (live display values without an MQTT broker)\n");
+    printf("\nHome Assistant WebSocket (live dashboard + service calls, no MQTT broker)\n");
     printf("  Show current config:\n");
     printf("    haconfig\n\n");
     printf("  Configure (fields merge into the stored config, so steps can be split):\n");
     printf("    setha -a 192.168.1.10 -t <long-lived-token>\n");
-    printf("    setha --temp sensor.loft_temperature --humidity sensor.loft_humidity --co2 sensor.loft_co2\n");
     printf("    setha --enable\n\n");
     printf("  Turn off (falls back to MQTT: the client is re-enabled automatically):\n");
     printf("    setha --disable\n\n");
-    printf("  Clear one display slot:\n");
-    printf("    setha --co2 \"\"\n\n");
     printf("  Notes:\n");
+    printf("    - Dashboard rooms/entities are a compile-time table: edit\n");
+    printf("      main/dashboard_config.h and rebuild to change what the panel shows.\n");
     printf("    - One transport at a time: 'setha --enable' stops the MQTT client\n");
-    printf("      (panel switch entities pause), 'setha --disable' brings it back.\n");
+    printf("      (dashboard controls need WS), 'setha --disable' brings MQTT back\n");
+    printf("      (panel degrades to read-only Loft values + Trends).\n");
     printf("    - Mint the token in HA: Profile -> Security -> Long-lived access tokens.\n");
     printf("    - Address forms: 192.168.1.10 or ha.local:8123 (-> ws://...:8123),\n");
     printf("      wss://ha.example.com or https://xyz.ui.nabu.casa (-> wss://...:443).\n");
@@ -65,12 +65,14 @@ static void print_mqtt_usage(void) {
     printf("  Sensor data from device:\n");
     printf("    topic: %s\n", CONFIG_TOPIC_SENSOR_DATA);
     printf("    data : {\"temp\":\"23.5\"}, {\"humidity\":\"55\"}, {\"co2\":\"600\"}, {\"tvoc\":\"12\"}\n\n");
-    printf("  Control device from Home Assistant/MQTT client:\n");
-    printf("    topic: %s\n", CONFIG_TOPIC_SWITCH_SET);
-    printf("    data : {\"switch1\":1}, {\"switch1\":0}, {\"switch5\":24}, {\"switch8\":50}\n\n");
-    printf("  Device publishes control state:\n");
-    printf("    topic: %s\n", CONFIG_TOPIC_SWITCH_STATE);
-    printf("    data : {\"switch1\":1}, {\"switch5\":24}, {\"switch8\":50}\n\n");
+    printf("  Push display values to the panel (read-only fallback when WS is off):\n");
+    printf("    topic: %s\n", CONFIG_TOPIC_DISPLAY_SET);
+    printf("    data : {\"loft_temp\":72.4}, {\"loft_humidity\":45,\"loft_co2\":620}\n\n");
+    printf("  Sound the buzzer (HA MQTT siren entity; 'beep' tests it locally):\n");
+    printf("    topic: %s\n", CONFIG_TOPIC_SIREN_SET);
+    printf("    data : {\"state\":\"ON\",\"tone\":\"doorbell\"}, {\"state\":\"ON\",\"tone\":\"alarm\",\"duration\":15},\n");
+    printf("           {\"state\":\"OFF\"} — or bare ON / OFF\n");
+    printf("    state: %s\n\n", CONFIG_TOPIC_SIREN_STATE);
 }
 
 static bool normalize_broker_url(const char *input, char *output, size_t output_size) {
@@ -125,16 +127,16 @@ static int read_ha_config(int argc, char **argv) {
     if (!ws_cfg.enabled && ws_cfg.url[0] == '\0' && ws_cfg.token[0] == '\0') {
         ESP_LOGI(TAG, "HA WebSocket not configured — see the 'setha' section in 'mqtthelp'.");
     } else {
-        static const char *slot_name[HA_WS_ENTITY_NUM] = {"temp", "humidity", "co2"};
+        int subscribable = 0;
+        for (int i = 0; i < DASH_SLOT_COUNT; i++) {
+            if (dash_slot_subscribable(i)) subscribable++;
+        }
+        char entities_row[48];
+        snprintf(entities_row, sizeof(entities_row), "%d dashboard slots (compile-time)", subscribable);
         ESP_LOGI(TAG, "| HA WebSocket                 | %-40s |", ws_cfg.enabled ? "enabled" : "disabled");
         ESP_LOGI(TAG, "| HA WebSocket URL             | %-40s |", ws_cfg.url[0] ? ws_cfg.url : "(not set)");
         ESP_LOGI(TAG, "| HA access token              | %-40s |", ws_cfg.token[0] ? "**** (set)" : "(not set)");
-        for (int i = 0; i < HA_WS_ENTITY_NUM; i++) {
-            char row[41];
-            snprintf(row, sizeof(row), "Entity (%s)", slot_name[i]);
-            ESP_LOGI(TAG, "| %-28s | %-40s |", row,
-                     ws_cfg.entity_id[i][0] ? ws_cfg.entity_id[i] : "(not set)");
-        }
+        ESP_LOGI(TAG, "| Entities                     | %-40s |", entities_row);
         if (strncmp(ws_cfg.url, "wss://", 6) == 0) {
             print_tls_trust_rows();
         }
@@ -417,48 +419,10 @@ static void register_mqtt_ca(void) {
 struct {
     struct arg_str *addr;
     struct arg_str *token;
-    struct arg_str *temp;
-    struct arg_str *humidity;
-    struct arg_str *co2;
     struct arg_lit *enable;
     struct arg_lit *disable;
     struct arg_end *end;
 } ha_ws_args;
-
-/* HA entity ids are domain.object_id. The charset check doubles as JSON-frame
- * safety: everything accepted here can be snprintf'd into the subscribe frame
- * without escaping. */
-static bool entity_id_ok(const char *s) {
-    size_t len = strlen(s);
-    if (len < 3 || len > 63 || s[0] == '.') return false;
-    bool has_dot = false;
-    for (size_t i = 0; i < len; i++) {
-        char c = s[i];
-        if (c == '.') has_dot = true;
-        else if (!isalnum((unsigned char)c) && c != '_' && c != '-') return false;
-    }
-    return has_dot;
-}
-
-/* Merge one entity-slot argument into cfg; "" clears the slot. */
-static bool ha_ws_merge_entity(const struct arg_str *arg, char *slot, size_t slot_size,
-                               const char *slot_name) {
-    if (arg->count == 0) return true;
-    const char *val = arg->sval[0];
-    memset(slot, 0, slot_size);
-    if (val[0] == '\0') {
-        ESP_LOGI(TAG, "Cleared %s entity", slot_name);
-        return true;
-    }
-    if (!entity_id_ok(val)) {
-        ESP_LOGE(TAG, "Invalid %s entity id '%s' (want e.g. sensor.loft_temperature, max 63 chars)",
-                 slot_name, val);
-        return false;
-    }
-    strncpy(slot, val, slot_size - 1);
-    ESP_LOGI(TAG, "Set %s entity: %s", slot_name, slot);
-    return true;
-}
 
 static int ha_ws_config_set_cmd(int argc, char **argv) {
     int nerrors = arg_parse(argc, argv, (void **)&ha_ws_args);
@@ -468,8 +432,7 @@ static int ha_ws_config_set_cmd(int argc, char **argv) {
         return 1;
     }
 
-    if (!ha_ws_args.addr->count && !ha_ws_args.token->count && !ha_ws_args.temp->count &&
-        !ha_ws_args.humidity->count && !ha_ws_args.co2->count && !ha_ws_args.enable->count &&
+    if (!ha_ws_args.addr->count && !ha_ws_args.token->count && !ha_ws_args.enable->count &&
         !ha_ws_args.disable->count) {
         print_ha_ws_usage();
         return 0;
@@ -514,25 +477,19 @@ static int ha_ws_config_set_cmd(int argc, char **argv) {
         ESP_LOGI(TAG, "Set HA access token: ****");
     }
 
-    if (!ha_ws_merge_entity(ha_ws_args.temp, ws_cfg.entity_id[0], sizeof(ws_cfg.entity_id[0]), "temp") ||
-        !ha_ws_merge_entity(ha_ws_args.humidity, ws_cfg.entity_id[1], sizeof(ws_cfg.entity_id[1]), "humidity") ||
-        !ha_ws_merge_entity(ha_ws_args.co2, ws_cfg.entity_id[2], sizeof(ws_cfg.entity_id[2]), "co2")) {
-        return 1;
-    }
-
     if (ha_ws_args.enable->count > 0) {
-        bool has_entity = ws_cfg.entity_id[0][0] || ws_cfg.entity_id[1][0] || ws_cfg.entity_id[2][0];
-        if (ws_cfg.url[0] == '\0' || ws_cfg.token[0] == '\0' || !has_entity) {
-            ESP_LOGE(TAG, "Cannot enable: missing%s%s%s (see 'mqtthelp')",
+        /* Entities come from the compile-time dashboard table; only the
+         * connection has to be provisioned at runtime. */
+        if (ws_cfg.url[0] == '\0' || ws_cfg.token[0] == '\0') {
+            ESP_LOGE(TAG, "Cannot enable: missing%s%s (see 'mqtthelp')",
                      ws_cfg.url[0] == '\0' ? " address (-a)" : "",
-                     ws_cfg.token[0] == '\0' ? " token (-t)" : "",
-                     !has_entity ? " an entity (--temp/--humidity/--co2)" : "");
+                     ws_cfg.token[0] == '\0' ? " token (-t)" : "");
             return 1;
         }
         ws_cfg.enabled = 1;
         ESP_LOGI(TAG, "HA WebSocket client enabled");
         /* One transport at a time: WS takes over, the MQTT client stops (the
-         * panel's MQTT switch entities pause until 'setmqtt --enable'). */
+         * display/set fallback pauses until 'setmqtt --enable'). */
         if (ha_mqtt_enabled_set(false) != ESP_OK) return 1;
         ESP_LOGI(TAG, "MQTT client disabled (one transport at a time)");
     }
@@ -560,19 +517,56 @@ static void register_ha_ws_config(void) {
     ha_ws_args.addr     = arg_str0("a", "addr", "<url>",
                                    "HA address, e.g. 192.168.1.10, ha.local:8123 or wss://ha.example.com");
     ha_ws_args.token    = arg_str0("t", "token", "<token>", "HA long-lived access token");
-    ha_ws_args.temp     = arg_str0(NULL, "temp", "<entity_id>", "entity for the temperature tile (\"\" clears)");
-    ha_ws_args.humidity = arg_str0(NULL, "humidity", "<entity_id>", "entity for the humidity tile (\"\" clears)");
-    ha_ws_args.co2      = arg_str0(NULL, "co2", "<entity_id>", "entity for the CO2 tile (\"\" clears)");
-    ha_ws_args.enable   = arg_lit0(NULL, "enable", "start the WebSocket client (needs addr+token+entity)");
+    ha_ws_args.enable   = arg_lit0(NULL, "enable", "start the WebSocket client (needs addr+token)");
     ha_ws_args.disable  = arg_lit0(NULL, "disable", "stop the WebSocket client");
-    ha_ws_args.end      = arg_end(7);
+    ha_ws_args.end      = arg_end(4);
 
     const esp_console_cmd_t cmd = {
         .command  = "setha",
-        .help     = "Set HA WebSocket config. Example: setha -a 192.168.1.10 -t <token> --temp sensor.x --enable",
+        .help     = "Set HA WebSocket config. Example: setha -a 192.168.1.10 -t <token> --enable",
         .hint     = NULL,
         .func     = &ha_ws_config_set_cmd,
         .argtable = &ha_ws_args,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+struct {
+    struct arg_str *tone;
+    struct arg_int *duration;
+    struct arg_lit *off;
+    struct arg_end *end;
+} beep_args;
+
+static int beep_cmd(int argc, char **argv) {
+    int nerrors = arg_parse(argc, argv, (void **)&beep_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, beep_args.end, argv[0]);
+        return 1;
+    }
+    if (beep_args.off->count > 0) {
+        ha_siren_stop();
+        printf("siren stopped\n");
+        return 0;
+    }
+    const char *tone = beep_args.tone->count > 0 ? beep_args.tone->sval[0] : "beep";
+    int duration     = beep_args.duration->count > 0 ? beep_args.duration->ival[0] : 0;
+    ha_siren_trigger(tone, duration);
+    return 0;
+}
+
+static void register_beep(void) {
+    beep_args.tone     = arg_str0("t", "tone", "<tone>", "beep (default), doorbell or alarm");
+    beep_args.duration = arg_int0("d", "duration", "<seconds>", "alarm run time (default 10, max 120)");
+    beep_args.off      = arg_lit0(NULL, "off", "stop the siren");
+    beep_args.end      = arg_end(3);
+
+    const esp_console_cmd_t cmd = {
+        .command  = "beep",
+        .help     = "Sound the buzzer. Example: beep -t doorbell | beep -t alarm -d 15 | beep --off",
+        .hint     = NULL,
+        .func     = &beep_cmd,
+        .argtable = &beep_args,
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
@@ -589,6 +583,7 @@ int indicator_cmd_init(void) {
     register_mqtt_config();
     register_mqtt_ca();
     register_ha_ws_config();
+    register_beep();
 
     esp_console_dev_uart_config_t hw_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_console_new_repl_uart(&hw_config, &repl_config, &repl));

@@ -143,8 +143,8 @@ int ha_sensor_on_mqtt_data(const char *topic, int topic_len, const char *data, i
         }
 
         ESP_LOGI(TAG, "HA display value %s = %s", display_keys[i], sensor_data.value);
-        /* Consumed by ha_switch.c's VIEW_EVENT_HA_SENSOR handler, which updates
-         * the display cards under the LVGL lock. */
+        /* Consumed by ha_history.c (trends ring) and ha_dash.c's MQTT-mode
+         * bridge, which re-posts onto the matching dashboard slot. */
         esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, &sensor_data, sizeof(sensor_data), portMAX_DELAY);
         posted++;
     }

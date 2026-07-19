@@ -49,8 +49,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: dev_check (architecture scan + regression tripwires)
         run: python3 scripts/dev_check.py --skip-build
-      - name: HA switch protocol
-        run: python3 scripts/test_ha_switch_protocol.py
       - name: ESP32 <-> RP2040 protocol constants
         run: python3 scripts/verify_rp2040_protocol.py
       - name: dev CLI

@@ -21,7 +21,9 @@
 #include "settings/settings_view.h"
 #include "ha_config.h"
 #include "wifi/wifi_view.h"
-#include "ha/ha_switch_screen.h"
+#include "ha/ha_dash.h"
+#include "ha/ha_dash_home_screen.h"
+#include "ha/ha_dash_room_screen.h"
 #include "ha/ha_trend_screen.h"
 #include "ha/ha_history.h"
 #include "ha/ha_ws_status_screen.h"
@@ -37,21 +39,23 @@ int main(void) {
 
     /* 1. Init LVGL + SDL2 display + input */
     lv_init();
-    lv_port_sim_init();   /* creates SDL2 window 480×800, wires mouse input */
+    lv_port_sim_init();   /* creates SDL2 window 480×480, wires mouse input */
 
     /* 2. Init view layer (hardware-free UI domains) */
     nav_init();
     indicator_display_view_init();
     view_sensor_init();
     indicator_wifi_view_init();
-    ha_switch_screen_create();
+    ha_dash_home_screen_init();
+    ha_dash_room_screens_init();
     ha_trend_screen_init();
     settings_view_init();
     ha_config_view_init();   /* broker modal (VIEW_EVENT_SCREEN_START handler) */
     ha_ws_status_screen_init(); /* HA WebSocket status modal (stubbed model) */
 
-    /* HA history model (registers the VIEW_EVENT_HA_SENSOR → VIEW_EVENT_HA_HISTORY
-     * handler). Must run before the mock seeds so early samples are captured. */
+    /* HA models: dashboard registry (MQTT-mode bridge) + history ring. Must
+     * run before the mock seeds so early samples are captured. */
+    ha_dash_init();
     ha_history_init();
 
     const char *open_settings = getenv("SIM_OPEN_SETTINGS");

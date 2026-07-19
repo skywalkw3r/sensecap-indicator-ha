@@ -131,16 +131,31 @@ struct view_data_ha_sensor_data {
     char    value[32];
 };
 
-struct view_data_ha_switch_data {
-    uint8_t index;
-    int     value;
-};
-
 /* HA WebSocket client connection status (values: ha_ws_status_t, ha_ws.h).
  * Payload of VIEW_EVENT_HA_WS_STATUS; the status screen re-reads the full
  * ha_ws_status_get() snapshot, so only the status value travels here. */
 struct view_data_ha_ws_status {
     uint8_t status;
+};
+
+/* One dashboard entity state (payload of VIEW_EVENT_HA_ENTITY). `slot` indexes
+ * dash_slots[] (ha/ha_dash.h). Numeric states arrive re-formatted like the
+ * legacy display values; non-numeric states ("on", "unavailable") verbatim.
+ * `brightness` is the light's raw 0..255 attribute, -1 when unknown/absent
+ * (attribute diffs only carry changed keys). */
+struct view_data_ha_entity {
+    uint8_t slot;
+    int16_t brightness;
+    char    state[32];
+};
+
+/* Media player snapshot (payload of VIEW_EVENT_HA_MEDIA). Posted whole on any
+ * observed change; empty strings mean "attribute absent" (idle player). */
+struct view_data_ha_media {
+    uint8_t slot;
+    char    state[16]; /* playing | paused | idle | off | unavailable | ... */
+    char    title[64];
+    char    artist[48];
 };
 
 /* Sensor-history window. Sized to the trends chart's on-screen point budget;
@@ -227,11 +242,11 @@ enum {
     VIEW_EVENT_HA_ADDR_DISPLAY,
 
     /* P: ha/ha_sensor.c (HA→device values on indicator/display/set);
-     *    ha/ha_ws.c (HA WebSocket subscribe_entities updates — while the WS
-     *    client is enabled it is the sole producer; ha_sensor.c then ignores
+     *    ha/ha_ws.c (legacy-index dashboard slots — while the WS client is
+     *    enabled it is the sole producer; ha_sensor.c then ignores
      *    indicator/display/set)
-     * C: ha/ha_switch.c (updates the Loft temp card + stat rows, LVGL lock held);
-     *    ha/ha_history.c (appends the parsed float to its per-series ring buffer)
+     * C: ha/ha_history.c (appends the parsed float to its per-series ring
+     *    buffer); ha/ha_dash.c (MQTT-mode bridge → VIEW_EVENT_HA_ENTITY)
      * Payload: struct view_data_ha_sensor_data */
     VIEW_EVENT_HA_SENSOR,
 
@@ -243,12 +258,6 @@ enum {
      * LVGL task, so it must hold lv_port_sem_take/give around chart mutation. */
     VIEW_EVENT_HA_HISTORY,
 
-    /* P: ha/ha_switch_screen.c  C: ha/ha_switch.c  Payload: struct view_data_ha_switch_data */
-    VIEW_EVENT_HA_SWITCH_ST,
-
-    /* P: ha/ha_switch.c  C: ha/ha_switch.c (updates screen, publishes state echo + persists)  Payload: struct view_data_ha_switch_data */
-    VIEW_EVENT_HA_SWITCH_SET,
-
     /* P: rp2040/rp2040.c  C: sensor/sensor_view.c  Payload: NULL
      * Posted once when the RP2040 UART link is silent for >15s (co-processor
      * down / unplugged). Consumer blanks all sensor cards to "N/A". Link
@@ -256,10 +265,26 @@ enum {
     VIEW_EVENT_RP2040_STALE,
 
     /* P: ha/ha_ws.c (on every WS client state transition)
-     * C: ha/ha_ws_status_screen.c (refreshes the settings status modal)
+     * C: ha/ha_ws_status_screen.c (refreshes the settings status modal),
+     *    ha/ha_dash_home_screen.c (connection pill)
      * Payload: struct view_data_ha_ws_status
      * LVGL: lock required — consumer runs in view_event_task. */
     VIEW_EVENT_HA_WS_STATUS,
+
+    /* P: ha/ha_ws.c (subscribe_entities snapshot + diffs, WS mode);
+     *    ha/ha_dash.c (MQTT-mode bridge: re-posts VIEW_EVENT_HA_SENSOR values
+     *    onto the matching legacy slot while the WS client is disabled)
+     * C: ha/ha_dash_home_screen.c (quick-action chips, room-card temps),
+     *    ha/ha_dash_room_screen.c (stat rows, toggles, light cards)
+     * Payload: struct view_data_ha_entity
+     * LVGL: lock required — consumers run in view_event_task. */
+    VIEW_EVENT_HA_ENTITY,
+
+    /* P: ha/ha_ws.c (merged media_player state+attribute cache, on change)
+     * C: ha/ha_dash_room_screen.c (media card: title/artist/play-pause glyph)
+     * Payload: struct view_data_ha_media
+     * LVGL: lock required — consumer runs in view_event_task. */
+    VIEW_EVENT_HA_MEDIA,
 
     VIEW_EVENT_ALL,
 };

@@ -41,7 +41,7 @@ main/
 
 域的文件命名因域而异，没有统一的 `<domain>_view.c` 规律。实际示例：
 ```
-main/ha/        ha.h, ha_mqtt.c, ha_sensor.c, ha_switch_screen.c, ha_config.c
+main/ha/        ha.h, ha_mqtt.c, ha_sensor.c, ha_dash.c, ha_dash_home_screen.c, ha_dash_room_screen.c, ha_config.c
 main/wifi/      wifi.h, wifi_model.c, wifi_view.c, wifi_list_screen.c, wifi_connect_screen.c
 main/sensor/    sensor_model.h, sensor_model.c, sensor_view.h, sensor_view.c
 main/display/   display.h, display_model.c, display_view.h, display_view.c
@@ -54,14 +54,14 @@ main/assets/    ui_img_*.c, ui_font_*.c（图像/字体资源）
 
 ## 导航系统
 
-主屏使用 `lv_tileview`，横向滑动，当前 3 个 tile（传感器数据页已移除：D1 无板载环境传感器，只会显示 N/A）：
+主屏使用 `lv_tileview`，横向滑动，当前 6 个 tile：仪表盘主页 + 每个房间一页（房间表在 `main/dashboard_config.h`）+ Trends（传感器数据页仍然移除：D1 无板载环境传感器）：
 
 ```c
-// main/nav/nav.h  ← 以此为准
-#define NAV_TILE_HA_CTRL  0   // Loft Controls（主页）：温度/湿度/CO2 + LED Strip
-#define NAV_TILE_HA_MIX   1   // General Controls：All Lights + Xmas Lights
-#define NAV_TILE_HA_TREND 2   // Trends：温度/湿度/CO2 历史折线图（lv_chart）
-#define NAV_TILE_COUNT    3
+// main/nav/nav.h  ← 以此为准（必须保持字面量，test_ui_geometry.py 直接解析数字）
+#define NAV_TILE_HOME        0   // 仪表盘主页：快捷操作 + 2x2 房间卡片
+#define NAV_TILE_ROOM_FIRST  1   // Loft / Guest Room / Living Room / Hallway & Other
+#define NAV_TILE_HA_TREND    5   // Trends：温度/湿度/CO2 历史折线图（lv_chart）
+#define NAV_TILE_COUNT       6
 ```
 
 弹窗/设置使用 `lv_layer_top()` 作为父容器（悬浮在 tileview 之上）。
@@ -217,8 +217,6 @@ python3 scripts/architecture_scan.py
 # 2. 构建（必须 0 error）
 ./dev build
 
-# 3. HA/MQTT 协议改动时额外运行
-python3 scripts/test_ha_switch_protocol.py
 ```
 
 ---

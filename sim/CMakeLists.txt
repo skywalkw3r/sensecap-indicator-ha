@@ -60,7 +60,9 @@ set(UI_SOURCES
     ${FW_ROOT}/main/display/display_view.c
     ${FW_ROOT}/main/settings/settings_view.c
     ${FW_ROOT}/main/sensor/sensor_view.c
-    ${FW_ROOT}/main/ha/ha_switch_screen.c
+    ${FW_ROOT}/main/ha/ha_dash.c
+    ${FW_ROOT}/main/ha/ha_dash_home_screen.c
+    ${FW_ROOT}/main/ha/ha_dash_room_screen.c
     ${FW_ROOT}/main/ha/ha_config.c
     ${FW_ROOT}/main/ha/ha_history.c
     ${FW_ROOT}/main/ha/ha_trend_screen.c

@@ -29,15 +29,15 @@ extern "C" {
 #define CONFIG_MQTT_PASSWORD                     ""
 
 #define CONFIG_HA_SENSOR_ENTITY_NUM              6
-#define CONFIG_HA_SWITCH_ENTITY_NUM              8
 
 // topic
 #define CONFIG_TOPIC_SENSOR_DATA                 "indicator/sensor"
 #define CONFIG_TOPIC_SENSOR_DATA_QOS             0
 
-#define CONFIG_TOPIC_SWITCH_STATE                "indicator/switch/state"
-#define CONFIG_TOPIC_SWITCH_SET                  "indicator/switch/set"
-#define CONFIG_TOPIC_SWITCH_QOS                  1
+/* Buzzer as an HA MQTT siren entity (ha_siren.c). */
+#define CONFIG_TOPIC_SIREN_STATE                 "indicator/siren/state"
+#define CONFIG_TOPIC_SIREN_SET                   "indicator/siren/set"
+#define CONFIG_TOPIC_SIREN_QOS                   1
 
 /* HA -> device display values (this is NOT the device's own sensor publish
  * topic, so there is no publish/subscribe echo loop). Home Assistant pushes
@@ -99,53 +99,9 @@ extern "C" {
 #define CONFIG_SENSOR6_UI_NAME                   "Humidity"
 #define CONFIG_SENSOR6_TOPIC_DATA                CONFIG_TOPIC_SENSOR_DATA
 
-// switch1
-#define CONFIG_SWITCH1_VALUE_KEY                 "switch1"
-#define CONFIG_SWITCH1_UI_NAME                   "Switch1"
-#define CONFIG_SWITCH1_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
-#define CONFIG_SWITCH1_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
-
-// switch2
-#define CONFIG_SWITCH2_VALUE_KEY                 "switch2"
-#define CONFIG_SWITCH2_UI_NAME                   "Switch2"
-#define CONFIG_SWITCH2_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
-#define CONFIG_SWITCH2_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
-
-// switch3
-#define CONFIG_SWITCH3_VALUE_KEY                 "switch3"
-#define CONFIG_SWITCH3_UI_NAME                   "Switch3"
-#define CONFIG_SWITCH3_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
-#define CONFIG_SWITCH3_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
-
-// switch4
-#define CONFIG_SWITCH4_VALUE_KEY                 "switch4"
-#define CONFIG_SWITCH4_UI_NAME                   "All Lights"
-#define CONFIG_SWITCH4_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
-#define CONFIG_SWITCH4_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
-
-// switch5
-#define CONFIG_SWITCH5_VALUE_KEY                 "switch5"
-#define CONFIG_SWITCH5_UI_NAME                   "Switch5"
-#define CONFIG_SWITCH5_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
-#define CONFIG_SWITCH5_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
-
-// switch6
-#define CONFIG_SWITCH6_VALUE_KEY                 "switch6"
-#define CONFIG_SWITCH6_UI_NAME                   "Xmas Lights"
-#define CONFIG_SWITCH6_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
-#define CONFIG_SWITCH6_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
-
-// switch7
-#define CONFIG_SWITCH7_VALUE_KEY                 "switch7"
-#define CONFIG_SWITCH7_UI_NAME                   "LED Strip"
-#define CONFIG_SWITCH7_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
-#define CONFIG_SWITCH7_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
-
-// switch8
-#define CONFIG_SWITCH8_VALUE_KEY                 "switch8"
-#define CONFIG_SWITCH8_UI_NAME                   "Loft Brightness"
-#define CONFIG_SWITCH8_TOPIC_STATE               CONFIG_TOPIC_SWITCH_STATE
-#define CONFIG_SWITCH8_TOPIC_SET                 CONFIG_TOPIC_SWITCH_SET
+/* The switch1..8 MQTT topic bridge was deliberately retired on this branch:
+ * dashboard controls (dashboard_config.h) call HA services directly over the
+ * WebSocket client, which also syncs true entity state back to the panel. */
 
 // New arrays for simplified entity initialization
 #define CONFIG_SENSOR_VALUE_KEYS { \
@@ -156,21 +112,6 @@ extern "C" {
 #define CONFIG_SENSOR_TOPICS { \
     CONFIG_SENSOR1_TOPIC_DATA, CONFIG_SENSOR2_TOPIC_DATA, CONFIG_SENSOR3_TOPIC_DATA, \
     CONFIG_SENSOR4_TOPIC_DATA, CONFIG_SENSOR5_TOPIC_DATA, CONFIG_SENSOR6_TOPIC_DATA \
-}
-
-#define CONFIG_SWITCH_VALUE_KEYS { \
-    CONFIG_SWITCH1_VALUE_KEY, CONFIG_SWITCH2_VALUE_KEY, CONFIG_SWITCH3_VALUE_KEY, CONFIG_SWITCH4_VALUE_KEY, \
-    CONFIG_SWITCH5_VALUE_KEY, CONFIG_SWITCH6_VALUE_KEY, CONFIG_SWITCH7_VALUE_KEY, CONFIG_SWITCH8_VALUE_KEY \
-}
-
-#define CONFIG_SWITCH_TOPICS_STATE { \
-    CONFIG_SWITCH1_TOPIC_STATE, CONFIG_SWITCH2_TOPIC_STATE, CONFIG_SWITCH3_TOPIC_STATE, CONFIG_SWITCH4_TOPIC_STATE, \
-    CONFIG_SWITCH5_TOPIC_STATE, CONFIG_SWITCH6_TOPIC_STATE, CONFIG_SWITCH7_TOPIC_STATE, CONFIG_SWITCH8_TOPIC_STATE \
-}
-
-#define CONFIG_SWITCH_TOPICS_SET { \
-    CONFIG_SWITCH1_TOPIC_SET, CONFIG_SWITCH2_TOPIC_SET, CONFIG_SWITCH3_TOPIC_SET, CONFIG_SWITCH4_TOPIC_SET, \
-    CONFIG_SWITCH5_TOPIC_SET, CONFIG_SWITCH6_TOPIC_SET, CONFIG_SWITCH7_TOPIC_SET, CONFIG_SWITCH8_TOPIC_SET \
 }
 
 #ifdef __cplusplus

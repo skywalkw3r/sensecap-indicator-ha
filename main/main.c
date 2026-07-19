@@ -51,8 +51,11 @@ void app_main(void) {
 	ESP_ERROR_CHECK(bsp_board_init());
 	lv_port_init();
 
+	/* Queue sized for the HA WebSocket initial-snapshot burst: one
+	 * VIEW_EVENT_HA_ENTITY per subscribed dashboard slot (plus the legacy
+	 * sensor + media posts) lands here back-to-back after (re)subscribe. */
 	esp_event_loop_args_t view_event_task_args = {
-		.queue_size = 10,
+		.queue_size = 16,
 		.task_name = "view_event_task",
 		.task_priority = uxTaskPriorityGet(NULL),
 		.task_stack_size = 10240,

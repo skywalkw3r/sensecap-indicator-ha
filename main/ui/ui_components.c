@@ -82,6 +82,47 @@ void ui_make_checkable(lv_obj_t *obj, lv_color_t accent)
     lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_PRESSED);
 }
 
+/* ── Icon badge / chip ────────────────────────────────────────────────── */
+
+lv_obj_t *ui_icon_badge(lv_obj_t *parent, const char *glyph,
+                        const lv_font_t *font, lv_color_t accent, int32_t diameter)
+{
+    lv_obj_t *badge = lv_obj_create(parent);
+    lv_obj_set_size(badge, diameter, diameter);
+    lv_obj_remove_flag(badge, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_radius(badge, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(badge, accent, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(badge, LV_OPA_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(badge, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(badge, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_t *icon = ui_label(badge, glyph, font, accent);
+    lv_obj_center(icon);
+    return badge;
+}
+
+lv_obj_t *ui_chip(lv_obj_t *parent, const char *glyph,
+                  const lv_font_t *glyph_font, const char *text)
+{
+    lv_obj_t *chip = lv_obj_create(parent);
+    ui_apply_card(chip);
+    ui_make_pressable(chip);
+    lv_obj_set_style_pad_all(chip, UI_SPACE_SM, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* Child 0: glyph. Recolouring on checked state is the caller's job (the
+     * state lives on the chip object; children don't inherit LV_STATE). */
+    lv_obj_t *icon = ui_label(chip, glyph, glyph_font, UI_COLOR_TEXT);
+    lv_obj_set_align(icon, LV_ALIGN_TOP_MID);
+
+    /* Child 1: caption, wrapping and centred at the bottom. */
+    lv_obj_t *label = ui_label(chip, text, UI_FONT_LABEL, UI_COLOR_TEXT);
+    lv_obj_set_width(label, lv_pct(100));
+    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_align(label, LV_ALIGN_BOTTOM_MID);
+    return chip;
+}
+
 /* ── Headers ──────────────────────────────────────────────────────────── */
 
 static lv_obj_t *ui_header_bar(lv_obj_t *parent)

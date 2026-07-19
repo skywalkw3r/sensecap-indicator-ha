@@ -8,19 +8,23 @@
  * Event delivery:
  *   VIEW_EVENT_SENSOR_DATA  — 1 Hz, all 4 built-in sensor types
  *   VIEW_EVENT_WIFI_ST      — once at startup (connected)
- *   VIEW_EVENT_HA_SENSOR    — HA-pushed loft temp/humidity/CO2 display values:
+ *   VIEW_EVENT_HA_SENSOR    — legacy loft temp/humidity/CO2 display values:
  *                             a batch seeded at startup (so the trends chart is
- *                             pre-populated), then 1 Hz thereafter. This is the
- *                             sim stand-in for indicator/display/set; it also
- *                             mirrors the ha_switch.c consumer the sim can't
- *                             compile, updating the Loft stat cards directly.
+ *                             pre-populated), then 1 Hz thereafter (this is the
+ *                             sim stand-in for indicator/display/set).
+ *   VIEW_EVENT_HA_ENTITY    — dashboard sensor slots (room temps + loft
+ *                             hum/CO2), 1 Hz, WS mode only (ha_ws_stub).
+ *                             Toggle/light/media state + command echo live in
+ *                             stubs/ha_ws_stub.c (seeded + ticked from here).
  */
 #include "mock_sensors.h"
 #include "view_data.h"
 #include "view_data_types.h"
 #include "sensor_model_stub.h"
 #include "lv_port.h"
-#include "ha_switch_screen.h"
+#include "ha_dash.h"
+#include "ha_ws.h"
+#include "ha_ws_stub.h"
 
 #include <SDL2/SDL.h>
 #include <math.h>
@@ -39,7 +43,6 @@ static float osc(float t, float lo, float hi, float period) {
 
 static uint32_t s_last_sensor_tick = 0;
 static bool     s_wifi_posted      = false;
-static bool     s_ha_registered    = false;
 static bool     s_ha_enabled       = true; /* SIM_NO_HA_MOCK=1 disables the HA feed */
 static int      s_ha_sample_n      = 0;   /* virtual seconds, continuous seed→live */
 
@@ -83,18 +86,6 @@ static void tick_sensors(void) {
 
 /* ── Home Assistant display values (loft temp / humidity / CO2) ───────────── */
 
-/* Sim stand-in for the ha_switch.c consumer (not compiled here): updates the
- * Loft stat cards from the same VIEW_EVENT_HA_SENSOR the history model reads. */
-static void ha_display_stat_handler(void *arg, esp_event_base_t base,
-                                    int32_t id, void *event_data) {
-    (void)arg; (void)base; (void)id;
-    const struct view_data_ha_sensor_data *s = event_data;
-    if (!s) return;
-    lv_port_sem_take();
-    ha_switch_screen_set_ha_value(s->index, s->value);
-    lv_port_sem_give();
-}
-
 static void post_ha_display(int index, const char *value) {
     struct view_data_ha_sensor_data d = { .index = (uint8_t)index };
     strncpy(d.value, value, sizeof(d.value) - 1);
@@ -104,7 +95,8 @@ static void post_ha_display(int index, const char *value) {
 
 /* Generate one plausible drifting sample per series at virtual time `t` and
  * post them, formatted the way Home Assistant templates would (temp 1 dp,
- * humidity/CO2 integers). */
+ * humidity/CO2 integers). In MQTT mode (SIM_MQTT_MODE=1) ha_dash.c's legacy
+ * bridge re-posts these onto the Loft dashboard slots — same as on-device. */
 static void tick_ha_display(float t) {
     char buf[32];
 
@@ -114,6 +106,35 @@ static void tick_ha_display(float t) {
     post_ha_display(1, buf);
     snprintf(buf, sizeof(buf), "%d", (int)(osc(t, 480.0f, 1050.0f, 50.0f) + 0.5f)); /* ppm */
     post_ha_display(2, buf);
+}
+
+/* ── Dashboard sensor slots (WS mode) ─────────────────────────────────────── */
+
+static void post_dash_sensor(int slot, const char *value) {
+    struct view_data_ha_entity d = { .slot = (uint8_t)slot, .brightness = -1 };
+    strncpy(d.state, value, sizeof(d.state) - 1);
+    esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_ENTITY,
+                      &d, sizeof(d), portMAX_DELAY);
+}
+
+/* Mirrors what ha_ws.c posts for SENSOR slots when subscribed: per-room
+ * temperatures (each room drifts around its own comfort point) plus the loft
+ * humidity/CO2 stat rows. */
+static void tick_dash_sensors(float t) {
+    char buf[32];
+
+    snprintf(buf, sizeof(buf), "%.1f", osc(t, 66.0f, 82.0f, 90.0f));
+    post_dash_sensor(SLOT_LOFT_TEMP, buf);
+    snprintf(buf, sizeof(buf), "%.1f", osc(t, 73.5f, 78.5f, 110.0f));
+    post_dash_sensor(SLOT_GUEST_TEMP, buf);
+    snprintf(buf, sizeof(buf), "%.1f", osc(t, 78.0f, 86.0f, 80.0f));
+    post_dash_sensor(SLOT_LIVING_TEMP, buf);
+    snprintf(buf, sizeof(buf), "%.1f", osc(t, 73.0f, 79.0f, 95.0f));
+    post_dash_sensor(SLOT_HALL_TEMP, buf);
+    snprintf(buf, sizeof(buf), "%d", (int)(osc(t, 35.0f, 65.0f, 70.0f) + 0.5f));
+    post_dash_sensor(SLOT_LOFT_HUM, buf);
+    snprintf(buf, sizeof(buf), "%d", (int)(osc(t, 480.0f, 1050.0f, 50.0f) + 0.5f));
+    post_dash_sensor(SLOT_LOFT_CO2, buf);
 }
 
 /* ── Public API ──────────────────────────────────────────────────────────── */
@@ -133,18 +154,17 @@ void mock_sensors_start(void) {
         return;
     }
 
-    /* Register the Loft stat-card updater (mirrors ha_switch.c), then seed the
-     * history so the trends chart is already populated for the first frame. */
-    if (!s_ha_registered) {
-        esp_event_handler_instance_register_with(view_event_handle, VIEW_EVENT_BASE,
-                                                 VIEW_EVENT_HA_SENSOR,
-                                                 ha_display_stat_handler, NULL, NULL);
-        s_ha_registered = true;
-    }
     printf("[mock] ha: seeding %d history samples\n", HA_SEED_SAMPLES);
     for (int i = 0; i < HA_SEED_SAMPLES; i++) {
         tick_ha_display((float)s_ha_sample_n);
         s_ha_sample_n++;
+    }
+
+    /* Dashboard: initial toggle/light/media states from the interactive stub,
+     * plus a first sensor pass so the room cards render populated. */
+    ha_ws_stub_seed();
+    if (ha_ws_is_enabled()) {
+        tick_dash_sensors((float)s_ha_sample_n);
     }
 }
 
@@ -160,8 +180,15 @@ void mock_sensors_tick(void) {
         tick_sensors();
         if (s_ha_enabled) {
             tick_ha_display((float)s_ha_sample_n);
+            if (ha_ws_is_enabled()) {
+                tick_dash_sensors((float)s_ha_sample_n);
+            }
             s_ha_sample_n++;
         }
         s_last_sensor_tick = now;
+    }
+
+    if (s_ha_enabled) {
+        ha_ws_stub_tick(now);
     }
 }

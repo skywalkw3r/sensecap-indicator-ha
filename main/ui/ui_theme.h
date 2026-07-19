@@ -32,6 +32,8 @@ extern "C" {
 #define UI_HEX_BLUE            0x52AAE5  /* humidity */
 #define UI_HEX_RED             0xD9534F  /* destructive / All Lights */
 #define UI_HEX_PRIMARY         0x4EACE4  /* primary accent (theme seed) */
+#define UI_HEX_CORAL           0xE57373  /* room accent (Loft) — softer than
+                                          * UI_HEX_RED, which stays destructive */
 
 /* ── lv_color_t convenience wrappers ──────────────────────────────────── */
 #define UI_COLOR_BG              lv_color_hex(UI_HEX_BG)
@@ -45,6 +47,7 @@ extern "C" {
 #define UI_COLOR_BLUE            lv_color_hex(UI_HEX_BLUE)
 #define UI_COLOR_RED             lv_color_hex(UI_HEX_RED)
 #define UI_COLOR_PRIMARY         lv_color_hex(UI_HEX_PRIMARY)
+#define UI_COLOR_CORAL           lv_color_hex(UI_HEX_CORAL)
 
 /* ── Radius / spacing scale ───────────────────────────────────────────── */
 #define UI_RADIUS_CARD    16   /* cards / panels */

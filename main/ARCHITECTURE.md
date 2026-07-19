@@ -16,11 +16,11 @@ main/
   view_data_types.h       Pure data types used by the event contract.
   lv_port.c               LVGL display/touch port. Owns lv_port_sem_take/give for LVGL thread safety.
 
-  nav/                    lv_tileview navigation for the main swipeable screens. Three tiles: NAV_TILE_HA_CTRL (Loft Controls), NAV_TILE_HA_MIX (General Controls), NAV_TILE_HA_TREND (Trends chart).
+  nav/                    lv_tileview navigation for the main swipeable screens. Six tiles: NAV_TILE_HOME (dashboard home), four room pages (NAV_TILE_ROOM_FIRST.., rooms from dashboard_config.h), NAV_TILE_HA_TREND (Trends chart).
   ui/                     Shared design system: tokens + theme install (ui_theme) and reusable card/label/header/modal constructors with pressed/checked + modal motion (ui_components).
   assets/                 LVGL 9 image/font descriptors used by handwritten screen components.
 
-  ha/                     Home Assistant domain: broker config, MQTT lifecycle, sensors, switches, screen widgets, sensor-history model (ha_history) + trends chart (ha_trend_screen).
+  ha/                     Home Assistant domain: broker config, MQTT lifecycle, sensors, siren, the dashboard registry + screens (ha_dash*, entities in main/dashboard_config.h), WebSocket client with service calls (ha_ws), sensor-history model (ha_history) + trends chart (ha_trend_screen).
   wifi/                   Wi-Fi domain: scanning, connection state, list/connect modals, status icon.
   sensor/                 Built-in sensor cache/parser and sensor data view.
   display/                LCD backlight, sleep mode, and display settings view.
@@ -140,7 +140,6 @@ Verifying changes:
 
 ```bash
 python3 scripts/dev_check.py --skip-build
-python3 scripts/test_ha_switch_protocol.py   # for HA/MQTT protocol changes
 ./dev build                                  # full firmware build when needed
 ```
 

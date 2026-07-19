@@ -15,8 +15,7 @@ extern "C" {
  * whole-series snapshot so the trends view can redraw.
  *
  * Pure model: no LVGL/widget ownership, no MQTT/NVS. Call once from the HA
- * domain model init path (indicator_ha_model_init), the same place
- * ha_switch_init() is wired.
+ * domain model init path (indicator_ha_model_init), next to ha_dash_init().
  */
 void ha_history_init(void);
 

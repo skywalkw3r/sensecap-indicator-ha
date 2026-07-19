@@ -37,10 +37,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
             instance_ptr->mqtt_connected_flag = true;
-            ha_switch_subscribe(client);
             /* HA→device display topic (indicator/display/set) — distinct from
              * the device's own publish topic, so no echo loop. */
             ha_sensor_subscribe(client);
+            ha_siren_subscribe(client);
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -60,7 +60,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGD(TAG, "MQTT_EVENT_DATA: TOPIC=%.*s", event->topic_len, event->topic);
             ESP_LOGD(TAG, "MQTT_EVENT_DATA: DATA=%.*s", event->data_len, event->data);
             ha_sensor_on_mqtt_data(event->topic, event->topic_len, event->data, event->data_len);
-            ha_switch_on_mqtt_data(event->topic, event->topic_len, event->data, event->data_len);
+            ha_siren_on_mqtt_data(event->topic, event->topic_len, event->data, event->data_len);
             break;
         case MQTT_EVENT_ERROR:
             ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
@@ -238,10 +238,14 @@ static void _mqtt_ha_start(instance_mqtt *instance)
 int indicator_ha_model_init(void)
 {
     ha_sensor_init();
-    ha_switch_init();
+    /* Dashboard registry: MQTT-mode legacy bridge (VIEW_EVENT_HA_SENSOR →
+     * VIEW_EVENT_HA_ENTITY). The WS client reads the same registry directly. */
+    ha_dash_init();
     /* History model: buffers the HA-pushed display values and feeds the trends
-     * chart over VIEW_EVENT_HA_HISTORY. Pure model, wired next to the switch. */
+     * chart over VIEW_EVENT_HA_HISTORY. Pure model. */
     ha_history_init();
+    /* Buzzer siren: MQTT entity + console 'beep' share this engine. */
+    ha_siren_init();
 
     esp_event_loop_args_t ha_event_task_args = {
         .queue_size = 5,
@@ -279,10 +283,11 @@ int indicator_ha_model_init(void)
 int indicator_ha_view_init(void)
 {
     ha_config_view_init();
-    ha_switch_screen_t *screen = ha_switch_screen_create();
-    ha_switch_attach_screen(screen);
+    /* Dashboard: Home tile (quick actions + room cards) and one page per room. */
+    ha_dash_home_screen_init();
+    ha_dash_room_screens_init();
     /* Trends tile (NAV_TILE_HA_TREND). HA domain owns the view; indicator_view.c
-     * reaches it through this aggregator, the same path as the switch screen. */
+     * reaches it through this aggregator, the same path as the dashboard. */
     ha_trend_screen_init();
     /* WebSocket status modal (settings "Home Assistant" card target). */
     ha_ws_status_screen_init();
