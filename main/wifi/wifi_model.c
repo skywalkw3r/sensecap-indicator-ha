@@ -8,6 +8,7 @@
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
+#include "esp_netif_sntp.h"
 #include "esp_timer.h"
 
 #include "lwip/err.h"
@@ -321,6 +322,25 @@ static void _ip_event_handler(void* arg, esp_event_base_t event_base, int32_t ev
 		_wifi_st_set(&st);
 		esp_event_post_to(view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_WIFI_ST, &st,
 						  sizeof(struct view_data_wifi_st), portMAX_DELAY);
+
+		/* One-shot SNTP start on first IP. TLS certificate validation (wss://,
+		 * mqtts:// with the public CA bundle) needs real wall-clock time — the
+		 * boot-default 1970 clock rejects every certificate as not-yet-valid.
+		 * The service keeps itself refreshed; nothing to do on reconnects. */
+		static bool sntp_started = false;
+		if(!sntp_started)
+		{
+			esp_sntp_config_t sntp_cfg = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+			if(esp_netif_sntp_init(&sntp_cfg) == ESP_OK)
+			{
+				sntp_started = true;
+				ESP_LOGI(TAG, "SNTP started (pool.ntp.org)");
+			}
+			else
+			{
+				ESP_LOGW(TAG, "SNTP init failed; TLS cert validation will not work");
+			}
+		}
 
 		xSemaphoreGive(_g_net_check_sem);
 	}

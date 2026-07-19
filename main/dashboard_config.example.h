@@ -53,6 +53,10 @@ enum dash_page {
     X(DASH_ROOM_LIVING,  "Living Room",     UI_ICON_SOFA,      UI_HEX_GREEN) \
     X(DASH_ROOM_HALLWAY, "Hallway & Other", UI_ICON_IMAGE,     UI_HEX_AMBER)
 
+/* POSIX TZ for the on-panel clock (localtime of SNTP-synced UTC).
+ * America/Denver — set yours. */
+#define DASH_TIMEZONE "MST7MDT,M3.2.0,M11.1.0"
+
 /* Slot flags. */
 #define DASH_F_CONFIRM    (1u << 0) /* ACTION: msgbox confirm before the call  */
 #define DASH_F_BRIGHTNESS (1u << 1) /* LIGHT: render a brightness slider       */

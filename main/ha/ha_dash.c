@@ -1,6 +1,8 @@
 #include "ha_dash.h"
 
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "esp_event.h"
 #include "freertos/FreeRTOS.h"
@@ -130,6 +132,11 @@ static void _legacy_bridge(void *handler_args, esp_event_base_t base, int32_t id
 
 void ha_dash_init(void)
 {
+    /* Localtime for the on-panel clock: SNTP (wifi_model) delivers UTC, the
+     * personal config supplies the zone. */
+    setenv("TZ", DASH_TIMEZONE, 1);
+    tzset();
+
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(
         view_event_handle, VIEW_EVENT_BASE, VIEW_EVENT_HA_SENSOR, _legacy_bridge, NULL, NULL));
 }

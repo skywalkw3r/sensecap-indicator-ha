@@ -1,6 +1,7 @@
 #include "ha_ws_status_screen.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "esp_log.h"
 #include "ha_config.h"
@@ -17,6 +18,7 @@ static lv_obj_t *s_modal = NULL;
 static lv_obj_t *s_status_value = NULL;
 static lv_obj_t *s_mqtt_value = NULL;
 static lv_obj_t *s_url_value = NULL;
+static lv_obj_t *s_conn_value = NULL;
 static lv_obj_t *s_entities_value = NULL;
 
 /* View-local mirror of the model's status meaning: text + accent per state.
@@ -65,6 +67,21 @@ static void _refresh(void)
     lv_obj_set_style_text_color(s_mqtt_value, mqtt_on ? UI_COLOR_GREEN : UI_COLOR_TEXT_MUTED,
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_label_set_text(s_url_value, snap.url[0] ? snap.url : "(not set)");
+
+    /* Transport security at a glance, derived from the URL scheme. */
+    if (snap.url[0] == '\0') {
+        lv_label_set_text(s_conn_value, "-");
+        lv_obj_set_style_text_color(s_conn_value, UI_COLOR_TEXT_MUTED,
+                                    LV_PART_MAIN | LV_STATE_DEFAULT);
+    } else if (strncmp(snap.url, "wss://", 6) == 0) {
+        lv_label_set_text(s_conn_value, "Encrypted (wss, TLS)");
+        lv_obj_set_style_text_color(s_conn_value, UI_COLOR_GREEN,
+                                    LV_PART_MAIN | LV_STATE_DEFAULT);
+    } else {
+        lv_label_set_text(s_conn_value, "Clear text (ws)");
+        lv_obj_set_style_text_color(s_conn_value, UI_COLOR_AMBER,
+                                    LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
 
     /* Entities are a compile-time table now (dashboard_config.h); show the
      * subscription size rather than three fixed ids. */
@@ -119,6 +136,7 @@ static void _ensure_modal(void)
     s_status_value = _add_row(card, "WebSocket status");
     s_mqtt_value = _add_row(card, "MQTT client");
     s_url_value = _add_row(card, "Server");
+    s_conn_value = _add_row(card, "Connection");
     s_entities_value = _add_row(card, "Entities");
 
     lv_obj_t *hint = ui_label(card, "Console setup: 'setha' (see 'mqtthelp')",

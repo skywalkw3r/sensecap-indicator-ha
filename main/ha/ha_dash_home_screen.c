@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "esp_event.h"
 #include "esp_log.h"
@@ -39,6 +40,7 @@ _Static_assert(NAV_TILE_COUNT == NAV_TILE_ROOM_FIRST + DASH_ROOM_COUNT + 1,
 
 /* ── Widget registry ─────────────────────────────────────────────────────── */
 static lv_obj_t *s_status_pill = NULL;
+static lv_obj_t *s_clock = NULL;
 static lv_obj_t *s_chip[DASH_SLOT_COUNT];      /* HOME-page chips by slot */
 static lv_obj_t *s_chip_icon[DASH_SLOT_COUNT]; /* their glyph labels */
 static lv_obj_t *s_room_temp[DASH_ROOM_COUNT]; /* room-card temp labels */
@@ -144,7 +146,7 @@ static void _create_room_card(lv_obj_t *tile, int room, int x, int y)
     (void)slot; /* slot→label mapping happens in the event handler */
 }
 
-/* ── Status pill ─────────────────────────────────────────────────────────── */
+/* ── Status pill (compact, sits left of the WiFi icon) ───────────────────── */
 
 static void _apply_status(uint8_t status)
 {
@@ -154,21 +156,48 @@ static void _apply_status(uint8_t status)
     const char *text;
     lv_color_t  color;
     if (!ha_ws_is_enabled()) {
-        text  = "MQTT (read-only)";
+        text  = "MQTT";
         color = UI_COLOR_TEXT_MUTED;
     } else {
         switch ((ha_ws_status_t)status) {
-            case HA_WS_STATUS_SUBSCRIBED:  text = "Live";            color = UI_COLOR_GREEN;      break;
+            case HA_WS_STATUS_SUBSCRIBED:  text = "Live";         color = UI_COLOR_GREEN;      break;
             case HA_WS_STATUS_CONNECTING:
             case HA_WS_STATUS_AUTHENTICATING:
-                                           text = "Connecting...";   color = UI_COLOR_AMBER;      break;
-            case HA_WS_STATUS_AUTH_FAILED: text = "Auth failed";     color = UI_COLOR_RED;        break;
-            case HA_WS_STATUS_UNCONFIGURED:text = "Set up HA in Settings"; color = UI_COLOR_TEXT_MUTED; break;
-            default:                       text = "Offline";         color = UI_COLOR_TEXT_MUTED; break;
+                                           text = "Connecting";   color = UI_COLOR_AMBER;      break;
+            case HA_WS_STATUS_AUTH_FAILED: text = "Auth failed";  color = UI_COLOR_RED;        break;
+            case HA_WS_STATUS_UNCONFIGURED:text = "Setup needed"; color = UI_COLOR_TEXT_MUTED; break;
+            default:                       text = "Offline";      color = UI_COLOR_TEXT_MUTED; break;
         }
     }
     lv_label_set_text(s_status_pill, text);
     lv_obj_set_style_text_color(s_status_pill, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+}
+
+/* ── Clock (top-centre; SNTP UTC + DASH_TIMEZONE) ────────────────────────── */
+
+static void _clock_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+    if (s_clock == NULL) {
+        return;
+    }
+
+    time_t    now = time(NULL);
+    struct tm local;
+    localtime_r(&now, &local);
+
+    char text[16];
+    if (local.tm_year + 1900 < 2021) {
+        /* SNTP hasn't landed yet — don't show 1970. */
+        snprintf(text, sizeof(text), "--:--");
+    } else {
+        strftime(text, sizeof(text), "%H:%M", &local); /* 24-hour */
+    }
+
+    /* LVGL-task timer context: no lock; skip the invalidate when unchanged. */
+    if (strcmp(lv_label_get_text(s_clock), text) != 0) {
+        lv_label_set_text(s_clock, text);
+    }
 }
 
 /* ── Live state (view_event_task → LVGL lock) ────────────────────────────── */
@@ -229,10 +258,17 @@ void ha_dash_home_screen_init(void)
     lv_port_sem_take();
     lv_obj_t *tile = nav_get_tile(NAV_TILE_HOME);
 
-    /* Connection pill between the gear (top-left) and WiFi (top-right). */
+    /* Clock front and centre; the compact connection pill tucks in left of
+     * the WiFi icon (60 px button anchored at the top-right corner). */
+    s_clock = ui_label(tile, "--:--", UI_FONT_TITLE, UI_COLOR_TEXT);
+    lv_obj_set_align(s_clock, LV_ALIGN_TOP_MID);
+    lv_obj_set_y(s_clock, PILL_Y);
+    lv_timer_create(_clock_timer_cb, 1000, NULL);
+    _clock_timer_cb(NULL);
+
     s_status_pill = ui_label(tile, "", LV_FONT_DEFAULT, UI_COLOR_TEXT_MUTED);
-    lv_obj_set_align(s_status_pill, LV_ALIGN_TOP_MID);
-    lv_obj_set_y(s_status_pill, PILL_Y);
+    lv_obj_set_align(s_status_pill, LV_ALIGN_TOP_RIGHT);
+    lv_obj_set_pos(s_status_pill, -80, 33);
     ha_ws_status_snapshot_t snap;
     ha_ws_status_get(&snap);
     _apply_status((uint8_t)snap.status);
