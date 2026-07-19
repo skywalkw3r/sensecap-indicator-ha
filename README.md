@@ -53,7 +53,7 @@ Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudi
 
 - Wi-Fi and MQTT broker setup from the touchscreen; everything (including WebSocket and TLS) from the serial console
 - NVS-backed persistence for Wi-Fi credentials, MQTT config, WebSocket config
-- Dashboard rooms/entities are compile-time (`main/dashboard_config.h`) — fill in your entity ids once, rebuild, flash
+- Dashboard rooms/entities are compile-time (`main/dashboard_config.h`, gitignored — auto-created from `dashboard_config.example.h`) — fill in your entity ids once, rebuild, flash
 - No compiled-in connection defaults: an unconfigured device stays idle and never phones home
 
 **Development**
@@ -186,7 +186,7 @@ See also: [Seeed wiki — Home Assistant application guide](https://wiki.seeedst
 
 1. **Mint a token** in Home Assistant: Profile → Security → *Long-lived access tokens* → Create token.
 
-2. **Fill in your entities** — edit the room/slot tables in [`main/dashboard_config.h`](main/dashboard_config.h) (the shipped ids are placeholders), then rebuild + flash. Rooms, icons, accent colours, switches, the light, media player and preset scripts all live in that one file.
+2. **Fill in your entities** — the first build copies [`main/dashboard_config.example.h`](main/dashboard_config.example.h) to `main/dashboard_config.h` (gitignored, so your home's entity ids never land in the repo). Edit that copy's room/slot tables with your real ids, then rebuild + flash. Rooms, icons, accent colours, switches, the light, media player and preset scripts all live in that one file.
 
 3. **Configure the connection over the serial console** (fields merge into the stored config, so this can be split across commands):
 

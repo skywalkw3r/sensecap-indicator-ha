@@ -77,12 +77,25 @@ static void _play_cb(lv_event_t *e)
     ha_ws_call("media_player", "media_play_pause", dash_slots[slot].entity_id, NULL);
 }
 
+static void _action_confirmed(void *user_data)
+{
+    int slot = (int)(intptr_t)user_data;
+    ha_ws_call("script", "turn_on", dash_slots[slot].entity_id, NULL);
+}
+
 static void _preset_cb(lv_event_t *e)
 {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
         return;
     }
     int slot = (int)(intptr_t)lv_event_get_user_data(e);
+    if (dash_slots[slot].flags & DASH_F_CONFIRM) {
+        char text[64];
+        snprintf(text, sizeof(text), "Run \"%s\"?", dash_slots[slot].label);
+        ui_confirm_msgbox("Confirm", text, "Run", UI_COLOR_RED,
+                          _action_confirmed, (void *)(intptr_t)slot);
+        return;
+    }
     ha_ws_call("script", "turn_on", dash_slots[slot].entity_id, NULL);
 }
 
@@ -258,13 +271,20 @@ static lv_obj_t *_build_action_chip(lv_obj_t *tile, int slot, int x, int y)
 
 static void _apply_sensor(int slot, const char *state)
 {
+    if (state[0] == '\0' || strcmp(state, "unavailable") == 0 ||
+        strcmp(state, "unknown") == 0 || strcmp(state, "none") == 0) {
+        lv_label_set_text(s_w[slot].value, "--");
+        return;
+    }
     char *end = NULL;
     (void)strtod(state, &end);
     bool numeric = end != state && end != NULL && *end == '\0';
     if (numeric) {
         lv_label_set_text_fmt(s_w[slot].value, "%s %s", state, dash_slots[slot].unit);
     } else {
-        lv_label_set_text(s_w[slot].value, "--");
+        /* Textual states render verbatim — e.g. a binary_sensor's "on"/"off"
+         * (the Supermicro power row). */
+        lv_label_set_text(s_w[slot].value, state);
     }
 }
 

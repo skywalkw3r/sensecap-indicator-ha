@@ -106,7 +106,10 @@ to `ha_ws_is_enabled()`), and `ha_sensor_on_mqtt_data()` additionally ignores
 
 ## Changing the Dashboard
 
-Everything lives in `main/dashboard_config.h`:
+Everything lives in `main/dashboard_config.h` — a gitignored personal file the
+build creates from `main/dashboard_config.example.h` on first configure (keep
+the template's slot symbols in sync when restructuring; the sim mock/stub
+reference them):
 
 1. **New entity on an existing page** — add an `X(...)` row to `DASH_SLOT_LIST`
    with the page, kind (`SENSOR`/`TOGGLE`/`LIGHT`/`ACTION`/`MEDIA`), entity id,

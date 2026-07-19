@@ -7,6 +7,15 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Root of the firmware repo (parent of this sim/ directory)
 set(FW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
+# The personal dashboard config is gitignored (real HA entity ids stay local);
+# a fresh checkout gets a buildable copy of the template. Guarded so a
+# reconfigure can never clobber an existing (user-edited) config.
+if(NOT EXISTS "${FW_ROOT}/main/dashboard_config.h")
+    configure_file("${FW_ROOT}/main/dashboard_config.example.h"
+                   "${FW_ROOT}/main/dashboard_config.h" COPYONLY)
+    message(STATUS "dashboard_config.h not found - created from dashboard_config.example.h (placeholder entities)")
+endif()
+
 # ── Dependencies ──────────────────────────────────────────────────────────────
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2 REQUIRED sdl2)

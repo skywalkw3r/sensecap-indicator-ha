@@ -112,3 +112,7 @@ click_deploy.zip
 # ESP-IDF Component Manager downloads — fetched from idf_component.yml on build.
 managed_components/
 __pycache__/
+
+# Personal dashboard config (real HA entity ids stay out of the repo).
+# Auto-created from main/dashboard_config.example.h on first build.
+main/dashboard_config.h

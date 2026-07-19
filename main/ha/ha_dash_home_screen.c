@@ -42,8 +42,6 @@ static lv_obj_t *s_status_pill = NULL;
 static lv_obj_t *s_chip[DASH_SLOT_COUNT];      /* HOME-page chips by slot */
 static lv_obj_t *s_chip_icon[DASH_SLOT_COUNT]; /* their glyph labels */
 static lv_obj_t *s_room_temp[DASH_ROOM_COUNT]; /* room-card temp labels */
-static lv_obj_t *s_confirm_mbox = NULL;
-static int       s_confirm_slot = -1;
 
 /* ── Service-call helpers (LVGL task context — no lock, bounded posts) ───── */
 
@@ -81,34 +79,13 @@ static void _toggle_chip_cb(lv_event_t *e)
     _call_toggle(slot, on);
 }
 
-/* ── All-off confirm dialog (ported from the retired General Controls) ───── */
+/* ── Action chips (DASH_F_CONFIRM ones go through the shared dialog) ─────── */
 
-static void _confirm_close(void)
+static void _action_confirmed(void *user_data)
 {
-    if (s_confirm_mbox != NULL) {
-        lv_msgbox_close(s_confirm_mbox);
-        s_confirm_mbox = NULL;
-        s_confirm_slot = -1;
-    }
-}
-
-static void _confirm_ok_cb(lv_event_t *e)
-{
-    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
-        return;
-    }
-    if (s_confirm_slot >= 0) {
-        ha_ws_call("script", "turn_on", dash_slots[s_confirm_slot].entity_id, NULL);
-        ESP_LOGI(TAG, "action: %s", dash_slots[s_confirm_slot].entity_id);
-    }
-    _confirm_close();
-}
-
-static void _confirm_cancel_cb(lv_event_t *e)
-{
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
-        _confirm_close();
-    }
+    int slot = (int)(intptr_t)user_data;
+    ha_ws_call("script", "turn_on", dash_slots[slot].entity_id, NULL);
+    ESP_LOGI(TAG, "action: %s", dash_slots[slot].entity_id);
 }
 
 static void _action_chip_cb(lv_event_t *e)
@@ -122,28 +99,10 @@ static void _action_chip_cb(lv_event_t *e)
         ha_ws_call("script", "turn_on", dash_slots[slot].entity_id, NULL);
         return;
     }
-    if (s_confirm_mbox != NULL) {
-        return;
-    }
-
-    lv_obj_t *mbox = lv_msgbox_create(NULL);
-    s_confirm_mbox = mbox;
-    s_confirm_slot = slot;
-    lv_obj_set_style_text_font(mbox, UI_FONT_LABEL, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(mbox, UI_COLOR_SURFACE, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(mbox, UI_RADIUS_CARD, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_msgbox_add_title(mbox, dash_slots[slot].label);
-    lv_msgbox_add_text(mbox, "Turn off all lights?");
-
-    lv_obj_t *ok = lv_msgbox_add_footer_button(mbox, "Turn Off");
-    lv_obj_set_style_bg_color(ok, UI_COLOR_RED, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_add_event_cb(ok, _confirm_ok_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *cancel = lv_msgbox_add_footer_button(mbox, "Cancel");
-    lv_obj_add_event_cb(cancel, _confirm_cancel_cb, LV_EVENT_CLICKED, NULL);
-
-    /* Subtle fade + rise as the confirm dialog appears (~250 ms ease-out). */
-    ui_modal_anim_in(mbox);
+    char text[64];
+    snprintf(text, sizeof(text), "Run \"%s\"?", dash_slots[slot].label);
+    ui_confirm_msgbox("Confirm", text, "Run", UI_COLOR_RED,
+                      _action_confirmed, (void *)(intptr_t)slot);
 }
 
 /* ── Room cards ──────────────────────────────────────────────────────────── */

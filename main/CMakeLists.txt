@@ -16,6 +16,15 @@ function(collect_sources source_var)
   set(${source_var} ${sources} PARENT_SCOPE)
 endfunction()
 
+# The personal dashboard config is gitignored (real HA entity ids stay local);
+# fresh checkouts and CI get a buildable copy of the template. Guarded so a
+# reconfigure can never clobber an existing (user-edited) config.
+if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/dashboard_config.h")
+  configure_file("${CMAKE_CURRENT_LIST_DIR}/dashboard_config.example.h"
+                 "${CMAKE_CURRENT_LIST_DIR}/dashboard_config.h" COPYONLY)
+  message(STATUS "dashboard_config.h not found - created from dashboard_config.example.h (placeholder entities)")
+endif()
+
 # Define a list of directories to include
 set(DIRECTORIES_TO_INCLUDE "util" "ui" "ha" "wifi" "sensor" "display" "settings" "rp2040" "btn" "mqtt" "storage" "cmd" "nav" "assets") # Recursively access folders | only modify here could be better
 

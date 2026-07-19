@@ -135,6 +135,7 @@ static void tick_dash_sensors(float t) {
     post_dash_sensor(SLOT_LOFT_HUM, buf);
     snprintf(buf, sizeof(buf), "%d", (int)(osc(t, 480.0f, 1050.0f, 50.0f) + 0.5f));
     post_dash_sensor(SLOT_LOFT_CO2, buf);
+    post_dash_sensor(SLOT_HALL_SERVER, "on"); /* Supermicro binary_sensor */
 }
 
 /* ── Public API ──────────────────────────────────────────────────────────── */

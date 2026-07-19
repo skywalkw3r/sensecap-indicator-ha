@@ -123,6 +123,64 @@ lv_obj_t *ui_chip(lv_obj_t *parent, const char *glyph,
     return chip;
 }
 
+/* ── Confirm dialog ───────────────────────────────────────────────────── */
+
+/* Singleton by design: one pending confirmation is all a 480x480 panel can
+ * meaningfully show, and the static slot doubles as the double-open guard. */
+static lv_obj_t       *s_confirm_mbox;
+static ui_confirm_cb_t s_confirm_cb;
+static void           *s_confirm_user_data;
+
+static void _confirm_btn_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED || s_confirm_mbox == NULL) {
+        return;
+    }
+    bool            ok = (bool)(intptr_t)lv_event_get_user_data(e);
+    ui_confirm_cb_t cb = s_confirm_cb;
+    void           *ud = s_confirm_user_data;
+    lv_obj_t     *mbox = s_confirm_mbox;
+
+    s_confirm_mbox      = NULL;
+    s_confirm_cb        = NULL;
+    s_confirm_user_data = NULL;
+    lv_msgbox_close(mbox);
+
+    if (ok && cb != NULL) {
+        cb(ud);
+    }
+}
+
+lv_obj_t *ui_confirm_msgbox(const char *title, const char *text,
+                            const char *ok_label, lv_color_t ok_color,
+                            ui_confirm_cb_t on_confirm, void *user_data)
+{
+    if (s_confirm_mbox != NULL) {
+        return NULL;
+    }
+
+    lv_obj_t *mbox = lv_msgbox_create(NULL);
+    s_confirm_mbox      = mbox;
+    s_confirm_cb        = on_confirm;
+    s_confirm_user_data = user_data;
+    lv_obj_set_style_text_font(mbox, UI_FONT_LABEL, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(mbox, UI_COLOR_SURFACE, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(mbox, UI_RADIUS_CARD, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_msgbox_add_title(mbox, title);
+    lv_msgbox_add_text(mbox, text);
+
+    lv_obj_t *ok = lv_msgbox_add_footer_button(mbox, ok_label);
+    lv_obj_set_style_bg_color(ok, ok_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_add_event_cb(ok, _confirm_btn_cb, LV_EVENT_CLICKED, (void *)(intptr_t)true);
+
+    lv_obj_t *cancel = lv_msgbox_add_footer_button(mbox, "Cancel");
+    lv_obj_add_event_cb(cancel, _confirm_btn_cb, LV_EVENT_CLICKED, (void *)(intptr_t)false);
+
+    /* Subtle fade + rise as the confirm dialog appears (~250 ms ease-out). */
+    ui_modal_anim_in(mbox);
+    return mbox;
+}
+
 /* ── Headers ──────────────────────────────────────────────────────────── */
 
 static lv_obj_t *ui_header_bar(lv_obj_t *parent)

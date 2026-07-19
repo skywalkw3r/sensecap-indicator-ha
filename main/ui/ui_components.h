@@ -44,6 +44,15 @@ lv_obj_t *ui_icon_badge(lv_obj_t *parent, const char *glyph,
 lv_obj_t *ui_chip(lv_obj_t *parent, const char *glyph,
                   const lv_font_t *glyph_font, const char *text);
 
+/* Themed confirm dialog (title + text + coloured OK button + Cancel), animated
+ * in. on_confirm(user_data) runs after the dialog closes on OK; Cancel just
+ * closes. One dialog at a time — returns NULL (and does nothing) if a confirm
+ * is already open. LVGL task context (input callbacks), like all of ui_*. */
+typedef void (*ui_confirm_cb_t)(void *user_data);
+lv_obj_t *ui_confirm_msgbox(const char *title, const char *text,
+                            const char *ok_label, lv_color_t ok_color,
+                            ui_confirm_cb_t on_confirm, void *user_data);
+
 /* Transparent full-width header bar (UI_HEADER_HEIGHT tall) with a centred
  * title. For the swipeable page tiles. Returns the header container. */
 lv_obj_t *ui_header(lv_obj_t *parent, const char *title);
