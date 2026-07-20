@@ -4,14 +4,16 @@
 
 Firmware that turns the [Seeed Studio SenseCAP Indicator](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) into a Home Assistant companion panel. It joins your Wi-Fi and talks to Home Assistant over your choice of two transports — classic **MQTT** (switch entities driven both ways, display values pushed by an automation, buzzer as a siren entity) or HA's native **WebSocket API** (the panel subscribes to entities directly; no broker or automation needed for live values). Touch controls, live temperature/humidity/CO₂ tiles, and a rolling Trends chart render on the 480×480 panel. All connections are outbound from the device; it opens no network ports.
 
-<figure class="third">
-    <img align="left" src="./assets/loft-controls.png" width="240"/>
-    <img align="center" src="./assets/general-controls.png" width="240"/>
-    <img align="left" src="./assets/trends.png" width="240"/>
-    <img align="center" src="./assets/mqtt-address-panel.png" width="240"/>
-    <img align="left" src="./assets/ha-websocket-status.png" width="240"/>
-</figure>
-
+<table>
+  <tr>
+    <td align="center"><img src="./assets/home.png" alt="Home dashboard"/><br/><sub><b>Home</b> — clock, quick actions, room cards</sub></td>
+    <td align="center"><img src="./assets/loft.png" alt="Loft room page"/><br/><sub><b>Loft</b> — environment tiles + light controls</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./assets/living-room.png" alt="Living Room media card"/><br/><sub><b>Living Room</b> — media player + playlist presets</sub></td>
+    <td align="center"><img src="./assets/trends.png" alt="Trends history chart"/><br/><sub><b>Trends</b> — rolling temperature / humidity / CO₂</sub></td>
+  </tr>
+</table>
 
 ---
 
@@ -178,7 +180,12 @@ Controls go the other way as `call_service` frames — toggles use `homeassistan
 
 4. **Add the dashboard.** Paste [`examples/homeassistant/dashboard.yaml`](examples/homeassistant/dashboard.yaml) into the Lovelace Raw Configuration Editor.
 
-<img src="./assets/Home Assistant Dashboard.png" />
+<table>
+  <tr>
+    <td align="center" width="38%"><img src="./assets/mqtt-broker.png" alt="On-device MQTT broker setup"/><br/><sub>On-device MQTT broker setup (step 2)</sub></td>
+    <td align="center" width="62%"><img src="./assets/ha-lovelace-dashboard.png" alt="Example Lovelace dashboard in Home Assistant"/><br/><sub>The example Lovelace dashboard in Home Assistant (step 4)</sub></td>
+  </tr>
+</table>
 
 See also: [Seeed wiki — Home Assistant application guide](https://wiki.seeedstudio.com/SenseCAP_Indicator_Application_Home_Assistant/).
 
@@ -196,6 +203,8 @@ See also: [Seeed wiki — Home Assistant application guide](https://wiki.seeedst
    ```
 
 4. **Check it**: `haconfig` prints the WebSocket block, and the Settings → *Home Asst* card on the touchscreen shows live connection status. `setha --disable` switches back to MQTT.
+
+<p align="center"><img src="./assets/ha-websocket-status.png" width="340" alt="On-device Home Assistant WebSocket status card"/><br/><sub>The Settings → Home Asst status card, live over WebSocket</sub></p>
 
 Addresses accept bare IPs and hostnames (`192.168.1.10`, `ha.local:8123` → `ws://…:8123`) or TLS URLs (`wss://ha.example.com`, `https://xyz.ui.nabu.casa` → `wss://…:443`); `wss://` uses the same trust settings as `mqtts://` (see [TLS](#tls-mqtts-and-wss)).
 
